@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.21
+# v0.20.27
 
 using Markdown
 using InteractiveUtils
@@ -7,91 +7,368 @@ using InteractiveUtils
 # ╔═╡ df96d71a-8c94-4268-b4b5-f899db9a42d1
 using Plots
 
+# ╔═╡ 72ce9fa6-f5a7-4861-971b-b868db127313
+using LinearAlgebra
+
+# ╔═╡ b460e0df-5aa3-4a1e-b2b3-a92ed3007fa3
+using Test
+
+# ╔═╡ e69a6728-e8ee-4a23-afc4-08dc8aafa669
+md"""
+
+# Simulation multi-agents : de la théorie cinétique des gaz à la modélisation de la condensation
+
+- **Auteur** 	: Karel Vilém Svoboda  
+- **Cours**  	: Computational physics 2   
+- **Date** 	: 22.05.2026  
+
+"""
+
+# ╔═╡ d774739f-4fec-4de3-a467-158ce2f57efd
+md"""
+## 1 La base du code : la classe Molecule
+"""
+
+# ╔═╡ 4d43a8ca-1ec8-44c0-8a6b-d16eaa95a3bd
+md"""
+### 1.1 Développez une classe nommée `Molecule`
+"""
+
 # ╔═╡ 6312f49c-0e57-11f1-004c-852d60e5287d
 mutable struct Molecule
-    r::Vector{Float64}   # position spatiale du centre [x, y, z] en m
-    v::Vector{Float64}   # vitesse [vx, vy, vz] en m/s
-    m::Float64           # masse en kg
-    ρ::Float64           # rayon de la sphère en m
-    formule::String      # formule chimique, ex: "He", "O2"
-	r_s::Vector{Vector{Float64}}
+    position::Vector{Float64}    # position spatiale du centre [x, y, z] en m
+    velocity::Vector{Float64}    # vitesse [vx, vy, vz] en m/s
+    mass::Float64                # masse de la molécule en kg
+    radius::Float64              # rayon en m
+    formula::String              # formaule chimique   
 end
+
+# ╔═╡ 1479e2d1-55e5-4aba-b3d9-bd755e7b19eb
+md"""
+## 2 Différents types de molécules
+
+### 2.1 Trouvez les valeurs des attributs de la classe Molecule pour les molécules suivantes : He, N e, N2, O2.
+"""
 
 # ╔═╡ 98816279-a0f4-48f4-9c11-a2d99934d799
 begin
-	    He = Molecule([0.0, 0.0, 0.0], [100.0,  50.0, 0.0], 6.6465e-27, 1.40e-10, "He", Vector{Float64}[])
-    Ne = Molecule([0.0, 0.0, 0.0], [ 80.0, 120.0, 0.0], 3.3509e-26, 1.54e-10, "Ne", Vector{Float64}[])
-    N2 = Molecule([0.0, 0.0, 0.0], [ 60.0, -80.0, 0.0], 4.6518e-26, 1.85e-10, "N2", Vector{Float64}[])
-    O2 = Molecule([0.0, 0.0, 0.0], [ 40.0,  90.0, 0.0], 5.3135e-26, 1.73e-10, "O2", Vector{Float64}[])
+	He = Molecule([0.0, 0.0, 0.0], [100.0,  50.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+    Ne = Molecule([0.0, 0.0, 0.0], [ 80.0, 120.0, 0.0], 3.3509e-26, 1.54e-10, "Ne")
+    N2 = Molecule([0.0, 0.0, 0.0], [ 60.0, -80.0, 0.0], 4.6518e-26, 1.85e-10, "N2")
+    O2 = Molecule([0.0, 0.0, 0.0], [ 40.0,  90.0, 0.0], 5.3135e-26, 1.73e-10, "O2")
     molecules = [He, Ne, N2, O2]
 end
 
+# ╔═╡ 3c864515-564e-4611-bdc5-2f9f770f610d
+md"""
+### 2.2 Quelles sont les différences entre ces molécules ? Est-ce que la théorie cinétique des gaz fonctionne pour toutes ces molécules ?
+
+#### Les différences
+
+He est la plus légère et la plus petite O2 est la plus lourde et N2 est la plus grande. Au niveau de la structure atomique, He et Ne sont monoatomiques et N2 et 02 sont diatomiques. Le a différence c'est le niveau de liberté, les atomes monoatomique en ont 3 et les diatomiques 5.
+
+#### Est-ce que la théorie cinétique fonctionne pour toutes ?
+
+Pour les atomes monoatomiques, He et Ne, oui, dans interactions, le modèle s'applique parfaitement. Pour les diatomiques, partiellement, on effectue une simplification en ignorant la forme allongée, la retation et la vibration des molécules et les interrations électostatiques entre les deux atomes de la molécule.
+"""
+
+# ╔═╡ 0206106c-81ab-4f35-ac9e-93d9504d4e61
+md"""
+## 3 Le déplacement d'une molécule
+
+Maintenant que vous avez réussi à créer la classe `Molecule`, vous allez mettre en mouvement celle-ci. Il est possible
+de simpliffier sa dynamique sous la forme d'un mouvement de projectile sans interaction avec son environnement.
+
+### 3.1 En utilisant la seconde loi de Newton, écrivez les équations gouvernant le mouvement de ces molécules
+
+En mouvement réctiligne uniforme, sans gravité et d'interration entre les molécules, la seconde loi de Newton donne :
+
+$$\vec{F} = m\cdot\vec{a} = \vec{0}$$
+
+$$\frac{d\vec{v}}{dt} = \vec{0} \implies \vec{v}(t) = \vec{v}(0) = \text{constante}$$
+
+$$\frac{d\vec{r}}{dt} = \vec{v} \implies \vec{r}(t) = \vec{r}(0) + \vec{v}\cdot t$$
+
+### 3.2 Utilisez les différences fnies sur le système d'équation obtenu à la question précédente.
+
+La discrétisation dans le temps avec la méthode d'Euler explicite donne :
+
+$$\vec{v}(t + \Delta t) = \vec{v}(t)$$
+
+$$\vec{r}(t + \Delta t) = \vec{r}(t) + \vec{v}(t) \cdot \Delta t$$
+"""
+
+# ╔═╡ db24edb4-8b4b-4d83-a875-ecfee8f89e9a
+md"""
+### 3.3 Implémentation `computeNextPosition`
+Implémentez ce calcul dans la méthode computeNextPosition calculant la position de la molécule au pas de temps d'après. Pour cette méthode, il vous est fortement conseillé de mettre en argument l'instance de la molécule puis de changer sa position directement dans la fonction.
+"""
+
 # ╔═╡ 05fd32d1-97e9-4ab5-a1d6-3fcbbd9f925b
 function computeNextPosition(molecule::Molecule, dt::Float64)
-	molecule.r = molecule.r + molecule.v * dt
-	push!(molecule.r_s, copy(molecule.r))
+	molecule.position .+= molecule.velocity .* dt
+end
+
+# ╔═╡ f7164257-150d-430a-9fd4-84115dcad863
+md"""
+### 3.3 Visuation de trajectoire
+Afin de vérifier et valider la nouvelle fonction implémentée, vous allez instancier une des molécules de l'exercice 2.1 et visualisez sa trajectoire au cours du temps. Quels position, vitesse, pas de temps et temps final avez-vous choisi et pourquoi ?
+
+#### Choix de position et vitesse initale
+J'ai placé la molécule au centre de la simulation [0, 0, 0] et donné une vitesse réalise pour une molécule d'hydrogène à température ambiante [100.0, 50.0, 0.0].
+
+Si on imagine une boite de taille 10e-8m et que la molécule bouge à vitesse constante à 100ms, alors la boite est traversée en 10e-10s. Done un delta de temps de 10e-12 est adéquat. Pour le temps final, on va commencer par 100 iérations dont 1e-9. 
+
+"""
+
+# ╔═╡ 185757a3-3bc2-43f6-a843-e1da59146e79
+function displayOneMoleculeMouvement(molecule::Molecule, deltaTime::Float64, finalTime::Float64)
+    positions_x = []
+    positions_y = []
+    
+    t = 0.0
+    while t <= finalTime
+        push!(positions_x, molecule.position[1])
+        push!(positions_y, molecule.position[2])
+        computeNextPosition(molecule, deltaTime)
+        t += deltaTime
+        # print(molecule.velocity)
+    end
+    plot(positions_x, positions_y)
 end
 
 # ╔═╡ 1d452f32-3c01-4269-afa6-fa151bd990b2
 begin
+displayOneMoleculeMouvement(He, 10e-12, 1e-9)
+end
+
+# ╔═╡ a9662ab2-221e-40bc-801f-884aa443a1fd
+md"""
+#### Analyse
+
+Comme on peut le voir, on observe un mouvement uniforme au cous du temps avec une vitesse constante.
+"""
+
+# ╔═╡ 1b0775ba-e51a-462e-8aa3-ef3bc0ec9fdf
+md"""
+## 4 Intéraction entre deux molécules
+
+Lorsqu'un système contient plusieurs molécules en mouvement, deux molécules peuvent s'approcher suffisamment l'une de l'autre et intéragir entre elles.
+
+### 4.1 
+Décrivez le type d'interaction qui peut se produire lorsque deux molécules s'approchent suffisamment l'une de l'autre. Expliquez également dans quelles conditions ce modèle d'interaction est pertinent et quelles hypothèses permettent de l'utiliser dans ce contexte
+
+C'est une collision élastique entre deux sphères rigides. Cela se produit quand se prduit quand leurs centres sont inférieurs ou égales à la somme de leur rayons :
+
+$$d \leq \rho_1 + \rho_2$$
+
+#### Hypthèses du modèle 
+	1. Les molécules sont des sphères rigides  
+	2. La collision est élastique (l'énergie cinétioque totale et la quatité de mouvement totale sont conservés) 
+	3. On ignore les degrés de liberté internes (pas de frictions ni de rotation)
+
+#### Pertinence du modèle
+	1. Pression basse pour que les interractions soient rares et brès
+	2. haute température, l'énergie cinétique doit dominer les forces d'attractions
+	3. Avoir des gaz nobles 
+
+"""
+
+# ╔═╡ b534f811-34d5-473f-bb44-b7c1b2841f98
+md"""
+### 4.2 Tests
+
+Avant d'implémenter le modèle de collision, proposez au minimum 4 scénarios de test permettant de vérifier que votre code fonctionne correctement. Vos cas de test doivent notamment permettre de contrôler : la conservation de la quantité de mouvement, la conservation de l'énergie cinétique et l'influence de l'angle de contact entre les deux molécules. Décrivez clairement chaque scénario (conditions initiales).
+
+L'objectif est de voir dans différents scénarios si :
+
+$$\vec{p_{tot}} = m_1\vec{v}_1 + m_2\vec{v}_2 = contanste$$
+$$E_{cin} = \frac{1}{2}m_1v^2_1 + \frac{1}{2}m_2v^2_2 = constante$$
+
+#### Scenario 1, Choc frontal avec 2 molécules `He`
+
+L'objectif est que les vitesses des molécules s'échangangent leurs vitesses.
+
+```
+État initial
+
+Molécule 1 (He): Vitesse [100, 0, 0]
+Molécule 2 (He): Vitesse [-100, 0, 0]
+
+Résultat attendu
+Molécule 1 (He): Vitesse [-100, 0, 0]
+Molécule 2 (He): Vitesse [100, 0, 0]
+```
+
+#### Scenario 2, Choc frontal avec 2 molécules `He` et `O2`
+
+La molécule `He` est en mouvement pendant que la molécule `O2` est immobile.
+
+```
+État initial
+
+Molécule 1 (He): Vitesse [100, 0, 0]
+Molécule 2 (O2): Vitesse [0, 0, 0]
+
+Résultat attendu
+La molécule `He` repart en arrière lentement pendant que 02 avance lentement
+```
+
+#### Scenario 3, Collision à 90° 
+
+Deux molécules `He` à la même vitesse font un choc à 90°.
+
+```
+État initial
+
+Molécule 1 (He): Vitesse [100, 0, 0]
+Molécule 2 (He): Vitesse [0, 100, 0]
+
+Résultat attendu
+Les vitesses sont redistribuées selon l'angle de contact.
+```
+
+
+#### Scenario 4, Pas de collision
+
+Les deux molécules ne devraient pas se toucher.
+
+```
+État initial
+
+Molécule 1 (He): Vitesse [100, 0, 0] Position [100, 100, 100]
+Molécule 2 (O2): Vitesse [0, 100, 0] Position [200, 200, 200]
+
+Résultat attendu
+Aucun changement
+```
+
+"""
+
+# ╔═╡ 5abe6eee-76ec-4d7d-b27e-7b72a784b1c7
+md"""
+### 4.3 `detectCollision`
+
+Rédigez une fonction qui détecte si deux molécules sont en interaction. Cette fonction doit renvoyer true lorsque la
+distance entre leurs centres est inférieure ou égale à la somme de leurs rayons et false dans le cas contraire.
+
+Implémenter : $d = ||\vec{r_1}-\vec{r_2}|| \leq \rho_1 + \rho_2$
+"""
+
+# ╔═╡ ed7f37a2-4a5a-4c35-842f-747353e48abd
+function detectCollision(molecule1:: Molecule, molecule2:: Molecule)
+	return norm(molecule1.position - molecule2.position) <= molecule1.radius + molecule2.radius
+end
+
+# ╔═╡ 8d92dc16-ef6b-48d6-94f1-3b1287b64c2c
+md"""
+### 4.4 Màj des collision et tests
+
+Implémentez l'algorithme étudié en cours avec Jessen permettant de mettre à jour l'état des molécules après une collision. À l'aide des cas de test défnis à la question 4.2, vérifiez que votre implémentation respecte les propriétés physiques attendues.
+
+La maj des vitesses après la collision se fait selon la composante normale au plan de contact.
+
+$$\vec{p}_{tot} = m_1\vec{v}_1 + m_2\vec{v}_2$$
+
+$$E_{cin} = \frac{1}{2}m_1||\vec{v}_1||^2 + \frac{1}{2}m_2||\vec{v}_2||^2$$
+
+---
+
+$$\hat{n} = \frac{\vec{r_1}-\vec{r_2}}{||\vec{r_1}-\vec{r_2}||}$$
+
+$$\vec{v}_1' = \vec{v}_1 - \frac{2m_2}{m_1+m_2}\left[(\vec{v}_1 - \vec{v}_2)\cdot\hat{n}\right]\hat{n}$$
+
+$$\vec{v}_2' = \vec{v}_2 + \frac{2m_1}{m_1+m_2}\left[(\vec{v}_1 - \vec{v}_2)\cdot\hat{n}\right]\hat{n}$$
+
+"""
+
+# ╔═╡ 11b51dba-e52e-4153-a1a3-151b4e3f850f
+function computeCollision(molecule1::Molecule, molecule2::Molecule)
+	v1 = copy(molecule1.velocity)
+	v2 = copy(molecule2.velocity)
+
+	# compostante normale au plan de contact
+	n = (molecule1.position - molecule2.position) / (norm(molecule1.position-molecule2.position))
 	
-	t_max = 1.0
-	delta_t = 0.01
-	steps = Int(t_max / delta_t)
+	v1_prime = v1 - (2*molecule2.mass)/(molecule1.mass+molecule2.mass) * dot(v1-v2, n) .* n
 
-	for molecule in molecules
-		for step in 1:steps
-			computeNextPosition(molecule, delta_t)
-		end
-	end
+	v2_prime = v2 + (2*molecule1.mass)/(molecule1.mass+molecule2.mass) * dot(v1-v2, n) .* n
+
+	molecule1.velocity .= v1_prime
+	molecule2.velocity .= v2_prime
 end
 
-# ╔═╡ c01c4d69-15a9-46d6-826b-0138f75866f8
-begin
-x_He = [pos[1] for pos in He.r_s]
-y_He = [pos[2] for pos in He.r_s]
+# ╔═╡ 78a927f5-5c01-4e44-a73b-35d952dba07a
+function movementQuantity(molecule1::Molecule, molecule2::Molecule)
+	return molecule1.mass*molecule1.velocity + molecule2.mass*molecule2.velocity
+end
 
-x_Ne = [pos[1] for pos in Ne.r_s]
-y_Ne = [pos[2] for pos in Ne.r_s]
+# ╔═╡ 7c60fb05-85f0-4fe8-a9a0-8c59f9706f38
+function cineticEnergy(molecule1::Molecule, molecule2::Molecule)
+    return 0.5*molecule1.mass*norm(molecule1.velocity)^2 + 0.5*molecule2.mass*norm(molecule2.velocity)^2
+end
 
-x_N2 = [pos[1] for pos in N2.r_s]
-y_N2 = [pos[2] for pos in N2.r_s]
-
-x_O2 = [pos[1] for pos in O2.r_s]
-y_O2 = [pos[2] for pos in O2.r_s]
-
-# On calcule les limites du plot pour qu'elles restent fixes pendant l'animation
-# (sinon l'axe "saute" à chaque frame ce qui est visuellement désagréable)
-all_x = [x_He; x_Ne; x_N2; x_O2]
-all_y = [y_He; y_Ne; y_N2; y_O2]
-xlims = (minimum(all_x), maximum(all_x))
-ylims = (minimum(all_y), maximum(all_y))
-
-# @gif crée le GIF en itérant sur les frames
-# À chaque frame i, on affiche la trajectoire jusqu'au point i
-@gif for i in 1:min(length(x_He), 80)
-    plot(x_He[1:i], y_He[1:i], label="He", color=:blue,
-         xlims=xlims, ylims=ylims,
-         title="Trajectoires des molécules", xlabel="x (m)", ylabel="y (m)")
+# ╔═╡ f53cb4ae-5b48-4f15-bd9b-f707dc8a3fc6
+@testset "Collision Tests" begin
     
-    # scatter! ajoute un point pour montrer la position actuelle de la molécule
-    scatter!([x_He[i]], [y_He[i]], label="", color=:blue, markersize=6)
+    @testset "Scenario 1 - Choc frontal He-He" begin
+        m1 = Molecule([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        m2 = Molecule([3.0e-10, 0.0, 0.0], [-100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        computeCollision(m1, m2)
+        @test m1.velocity ≈ [-100.0, 0.0, 0.0]
+        @test m2.velocity ≈ [100.0, 0.0, 0.0]
+    end
 
-    plot!(x_Ne[1:i], y_Ne[1:i], label="Ne", color=:red)
-    scatter!([x_Ne[i]], [y_Ne[i]], label="", color=:red, markersize=6)
+    @testset "Scenario 2 - Choc frontal He-O2" begin
+        m1 = Molecule([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        m2 = Molecule([3.0e-10, 0.0, 0.0], [0.0, 0.0, 0.0], 5.3135e-26, 1.73e-10, "O2")
+        p_avant = movementQuantity(m1, m2)
+        e_avant = cineticEnergy(m1, m2)
+        computeCollision(m1, m2)
+        @test movementQuantity(m1, m2) ≈ p_avant
+        @test cineticEnergy(m1, m2) ≈ e_avant
+        @test m1.velocity[1] < 0
+        @test m2.velocity[1] > 0
+    end
 
-    plot!(x_N2[1:i], y_N2[1:i], label="N2", color=:green)
-    scatter!([x_N2[i]], [y_N2[i]], label="", color=:green, markersize=6)
+    @testset "Scenario 3 - Collision 90°" begin
+        m1 = Molecule([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        m2 = Molecule([3.0e-10, 0.0, 0.0], [0.0, 100.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        p_avant = movementQuantity(m1, m2)
+        e_avant = cineticEnergy(m1, m2)
+        computeCollision(m1, m2)
+        @test movementQuantity(m1, m2) ≈ p_avant
+        @test cineticEnergy(m1, m2) ≈ e_avant
+    end
 
-    plot!(x_O2[1:i], y_O2[1:i], label="O2", color=:orange)
-    scatter!([x_O2[i]], [y_O2[i]], label="", color=:orange, markersize=6)
-end fps=15
+    @testset "Scenario 4 - Pas de collision" begin
+        m1 = Molecule([0.0, 0.0, 0.0], [100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        m2 = Molecule([100.0, 100.0, 100.0], [0.0, 100.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        v1_avant = copy(m1.velocity)
+        v2_avant = copy(m2.velocity)
+        if detectCollision(m1, m2)
+            computeCollision(m1, m2)
+        end
+        @test m1.velocity ≈ v1_avant
+        @test m2.velocity ≈ v2_avant
+    end
+
 end
+
+# ╔═╡ eaa968af-d013-4d16-b62f-713500a68b18
+md"""
+## 5 Le domaine de simulation
+
+Le domaine représente l'espace dans lequel vos molécules évoluent et interagissent. Dans ce laboratoire, cet espace
+est modélisé comme un pavé droit (un cuboïd), de dimensions Lx × Ly × Lz centré autour de la position (0, 0, 0).
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Plots = "~1.41.6"
@@ -101,9 +378,9 @@ Plots = "~1.41.6"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.7"
+julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "e54bd75f512fc2f6b1d00371746d9096862f5b4d"
+project_hash = "4629b51bdbe2ba032a039c84c80dbb24ea7bd996"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -183,7 +460,7 @@ version = "0.13.1"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.1.1+0"
+version = "1.3.0+1"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -232,7 +509,7 @@ version = "0.9.5"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-version = "1.6.0"
+version = "1.7.0"
 
 [[deps.EpollShim_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -259,7 +536,7 @@ uuid = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
 version = "0.4.5"
 
 [[deps.FFMPEG_jll]]
-deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
+deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers", "LAME_jll", "Libdl", "Ogg_jll", "OpenSSL_jll", "Opus_jll", "PCRE2_jll", "Zlib_jll", "libaom_jll", "libass_jll", "libfdk_aac_jll", "libva_jll", "libvorbis_jll", "x264_jll", "x265_jll"]
 git-tree-sha1 = "01ba9d15e9eae375dc1eb9589df76b3572acd3f2"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "8.0.1+0"
@@ -402,6 +679,11 @@ git-tree-sha1 = "b6893345fd6658c8e475d40155789f4860ac3b21"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.4+0"
 
+[[deps.JuliaSyntaxHighlighting]]
+deps = ["StyledStrings"]
+uuid = "ac6e5ff7-fb65-4e79-a425-ec3bc9c03011"
+version = "1.12.0"
+
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "059aabebaa7c82ccb853dd4a0ee9d17796f7e1bc"
@@ -455,24 +737,24 @@ uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
 version = "0.6.4"
 
 [[deps.LibCURL_jll]]
-deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "8.6.0+0"
+version = "8.15.0+0"
 
 [[deps.LibGit2]]
-deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
+deps = ["LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 version = "1.11.0"
 
 [[deps.LibGit2_jll]]
-deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "OpenSSL_jll"]
 uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
-version = "1.7.2+0"
+version = "1.9.0+0"
 
 [[deps.LibSSH2_jll]]
-deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
+deps = ["Artifacts", "Libdl", "OpenSSL_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.11.0+1"
+version = "1.11.3+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -517,7 +799,7 @@ version = "2.41.3+0"
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-version = "1.11.0"
+version = "1.12.0"
 
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -551,7 +833,7 @@ uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.5.16"
 
 [[deps.Markdown]]
-deps = ["Base64"]
+deps = ["Base64", "JuliaSyntaxHighlighting", "StyledStrings"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
 
@@ -562,7 +844,8 @@ uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
 version = "1.1.9"
 
 [[deps.MbedTLS_jll]]
-deps = ["Artifacts", "Libdl"]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "926c6af3a037c68d02596a44c22ec3595f5f760b"
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
 
@@ -583,7 +866,7 @@ version = "1.11.0"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2023.12.12"
+version = "2025.11.4"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -593,7 +876,7 @@ version = "1.1.3"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
-version = "1.2.0"
+version = "1.3.0"
 
 [[deps.Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -604,12 +887,12 @@ version = "1.3.6+0"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.27+1"
+version = "0.3.29+0"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.5+0"
+version = "0.8.7+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "NetworkOptions", "OpenSSL_jll", "Sockets"]
@@ -618,10 +901,9 @@ uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
 version = "1.6.1"
 
 [[deps.OpenSSL_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "c9cbeda6aceffc52d8a0017e71db27c7a7c0beaf"
+deps = ["Artifacts", "Libdl"]
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.5.5+0"
+version = "3.5.4+0"
 
 [[deps.Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -637,7 +919,7 @@ version = "1.8.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.42.0+1"
+version = "10.44.0+1"
 
 [[deps.Pango_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl"]
@@ -660,7 +942,7 @@ version = "0.44.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.11.0"
+version = "1.12.1"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
@@ -745,7 +1027,7 @@ uuid = "e99dba38-086e-5de3-a5b1-6e4c66e897c3"
 version = "6.8.2+2"
 
 [[deps.REPL]]
-deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
+deps = ["InteractiveUtils", "JuliaSyntaxHighlighting", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 version = "1.11.0"
 
@@ -821,7 +1103,7 @@ version = "1.2.2"
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-version = "1.11.0"
+version = "1.12.0"
 
 [[deps.StableRNGs]]
 deps = ["Random"]
@@ -872,7 +1154,7 @@ version = "1.11.0"
 [[deps.SuiteSparse_jll]]
 deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
-version = "7.7.0+0"
+version = "7.8.3+2"
 
 [[deps.TOML]]
 deps = ["Dates"]
@@ -1015,6 +1297,12 @@ git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
 uuid = "ea2f1a96-1ddc-540d-b46f-429655e07cfa"
 version = "0.9.12+0"
 
+[[deps.Xorg_libpciaccess_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
+git-tree-sha1 = "58972370b81423fc546c56a60ed1a009450177c3"
+uuid = "a65dc6b1-eb27-53a1-bb3e-dea574b5389e"
+version = "0.19.0+0"
+
 [[deps.Xorg_libxcb_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_jll"]
 git-tree-sha1 = "bfcaf7ec088eaba362093393fe11aa141fa15422"
@@ -1084,7 +1372,7 @@ version = "1.6.0+0"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.13+1"
+version = "1.3.1+2"
 
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1119,13 +1407,19 @@ version = "0.17.4+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.11.0+0"
+version = "5.15.0+0"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
 git-tree-sha1 = "9bf7903af251d2050b467f76bdbe57ce541f7f4f"
 uuid = "1183f4f0-6f2a-5f1a-908b-139f9cdfea6f"
 version = "0.2.2+0"
+
+[[deps.libdrm_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libpciaccess_jll"]
+git-tree-sha1 = "63aac0bcb0b582e11bad965cef4a689905456c03"
+uuid = "8e53e030-5e6c-5a89-a30b-be5b7263a166"
+version = "2.4.125+1"
 
 [[deps.libevdev_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1151,6 +1445,12 @@ git-tree-sha1 = "e015f211ebb898c8180887012b938f3851e719ac"
 uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
 version = "1.6.55+0"
 
+[[deps.libva_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll", "Xorg_libXfixes_jll", "libdrm_jll"]
+git-tree-sha1 = "7dbf96baae3310fe2fa0df0ccbb3c6288d5816c9"
+uuid = "9a156e7d-b971-5f62-b2c9-67348b8fb97c"
+version = "2.23.0+0"
+
 [[deps.libvorbis_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Ogg_jll"]
 git-tree-sha1 = "11e1772e7f3cc987e9d3de991dd4f6b2602663a5"
@@ -1166,12 +1466,12 @@ version = "1.1.7+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.59.0+0"
+version = "1.64.0+1"
 
 [[deps.p7zip_jll]]
-deps = ["Artifacts", "Libdl"]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+2"
+version = "17.7.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1193,11 +1493,32 @@ version = "1.13.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╠═e69a6728-e8ee-4a23-afc4-08dc8aafa669
+# ╠═d774739f-4fec-4de3-a467-158ce2f57efd
 # ╠═df96d71a-8c94-4268-b4b5-f899db9a42d1
+# ╠═4d43a8ca-1ec8-44c0-8a6b-d16eaa95a3bd
 # ╠═6312f49c-0e57-11f1-004c-852d60e5287d
+# ╠═1479e2d1-55e5-4aba-b3d9-bd755e7b19eb
 # ╠═98816279-a0f4-48f4-9c11-a2d99934d799
-# ╠═1d452f32-3c01-4269-afa6-fa151bd990b2
+# ╠═3c864515-564e-4611-bdc5-2f9f770f610d
+# ╠═0206106c-81ab-4f35-ac9e-93d9504d4e61
+# ╠═db24edb4-8b4b-4d83-a875-ecfee8f89e9a
 # ╠═05fd32d1-97e9-4ab5-a1d6-3fcbbd9f925b
-# ╠═c01c4d69-15a9-46d6-826b-0138f75866f8
+# ╠═f7164257-150d-430a-9fd4-84115dcad863
+# ╠═185757a3-3bc2-43f6-a843-e1da59146e79
+# ╠═1d452f32-3c01-4269-afa6-fa151bd990b2
+# ╠═a9662ab2-221e-40bc-801f-884aa443a1fd
+# ╠═1b0775ba-e51a-462e-8aa3-ef3bc0ec9fdf
+# ╠═b534f811-34d5-473f-bb44-b7c1b2841f98
+# ╠═5abe6eee-76ec-4d7d-b27e-7b72a784b1c7
+# ╠═ed7f37a2-4a5a-4c35-842f-747353e48abd
+# ╠═8d92dc16-ef6b-48d6-94f1-3b1287b64c2c
+# ╠═72ce9fa6-f5a7-4861-971b-b868db127313
+# ╠═11b51dba-e52e-4153-a1a3-151b4e3f850f
+# ╠═b460e0df-5aa3-4a1e-b2b3-a92ed3007fa3
+# ╠═78a927f5-5c01-4e44-a73b-35d952dba07a
+# ╠═7c60fb05-85f0-4fe8-a9a0-8c59f9706f38
+# ╠═f53cb4ae-5b48-4f15-bd9b-f707dc8a3fc6
+# ╠═eaa968af-d013-4d16-b62f-713500a68b18
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

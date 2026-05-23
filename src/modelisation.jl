@@ -13,6 +13,9 @@ using LinearAlgebra
 # ╔═╡ b460e0df-5aa3-4a1e-b2b3-a92ed3007fa3
 using Test
 
+# ╔═╡ e575895b-63ef-44b2-9265-aac1af08cb60
+using Statistics
+
 # ╔═╡ e69a6728-e8ee-4a23-afc4-08dc8aafa669
 md"""
 
@@ -363,11 +366,597 @@ Le domaine représente l'espace dans lequel vos molécules évoluent et interagi
 est modélisé comme un pavé droit (un cuboïd), de dimensions Lx × Ly × Lz centré autour de la position (0, 0, 0).
 """
 
+# ╔═╡ b2ca41ad-c8b8-423e-a75f-56bd2b737890
+md"""
+### 5.1 class `Domain`
+
+Développez une nouvelle classe nommée Domain qui représente le volume dans lequel se trouvent les molécules.
+Cette classe doit contenir les attributs suivants :
+- la longueur de l'axe x : Lx (m)
+- la longueur de l'axe y : Ly (m)
+- la longueur de l'axe z : Lz (m)
+"""
+
+# ╔═╡ 375c8598-0034-445e-b3e8-bcd58a471c5f
+struct Domain
+	L::Vector{Float64} # Taille en 3D du domaine en m
+end
+
+# ╔═╡ 22b1998c-045d-4d0b-9ca8-40ab8c208d95
+md"""
+### 5.2
+Ajoutez une fonction permettant de calculer automatiquement son volume
+"""
+
+# ╔═╡ e018bcc6-5f90-429f-a749-6b4011dfbad4
+function domainVolume(domain::Domain)
+	return prod(domain.L)
+end
+
+# ╔═╡ 6b2dc248-8208-47fd-987c-5c1726127353
+md"""
+### 5.3
+Après avoir proposé une vérification de votre classe et de votre méthode de calcul du volume, implémentez cette vérification pour vous assurer de leur bon fonctionnement.
+
+Un volume qui fait 10m de large avec 5m de largeur et 3 m de profondeur devrait faire :
+
+$$10*5*3 = 150m^3$$ 
+"""
+
+# ╔═╡ c6e70817-cebf-4ac8-bf11-79df05a39e6c
+@testset "Domain Tests" begin
+    d = Domain([10.0, 5.0, 3.0])
+    @test domainVolume(d) ≈ 150.0
+end
+
+# ╔═╡ ff8a5c41-8ec5-4208-a1d8-165dfb6e9d99
+md"""
+## 6 Condition de bord/limite : réflexion spéculaire
+
+Si une molécule rebondit sur les parois par réflécion spéculaire, si une molécule sort du domaine sur un axe, il faut corrifer la position en la rléfléchissant par rapport au mur. en inversant la composante de vitesse correspondante.
+
+Nouvelle position :
+
+$$x_{new} = Lx - d$$
+
+Vitesse corrigée : 
+
+$$v_x \rightarrow -vx$$
+"""
+
+# ╔═╡ 8c2b6820-8a02-4879-afe5-3b35cebe1ea8
+md"""
+### 6.1
+Implémentez une fonction qui corrige la position et la vitesse d'une molécule lorsqu'elle se retrouve en dehors du
+domaine. Cette fonction doit vérifier chaque axe séparément et appliquer la réflexion si nécessaire.
+"""
+
+# ╔═╡ 40d672a8-4dee-48f7-a241-5e14df293bc2
+function applyBoundaries(molecule::Molecule, domain::Domain)
+    for i in 1:3
+        if molecule.position[i] < 0
+            molecule.position[i] = -molecule.position[i]
+            molecule.velocity[i] = -molecule.velocity[i]
+        elseif molecule.position[i] > domain.L[i]
+            molecule.position[i] = 2*domain.L[i] - molecule.position[i]
+            molecule.velocity[i] = -molecule.velocity[i]
+        end
+    end
+end
+
+# ╔═╡ ab3d206c-35d9-40ef-8154-3c1cc6b6fc4e
+md"""
+### 6.2
+
+Proposez puis implémentez au minimum 8 scénarios de test permettant de vérifer que votre code fonctionne correctement. Vos cas de test doivent notamment permettre de contrôler : le changement de vitesse et de position
+pour chaque paroi (une ou plusieurs)
+"""
+
+# ╔═╡ aff6073d-d727-4b0e-b3b2-166b2175e72e
+@testset "Boundary Tests" begin
+    domain = Domain([10.0, 10.0, 10.0])
+
+    @testset "Bord gauche x < 0" begin
+        m = Molecule([-1.0, 5.0, 5.0], [-100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[1] ≈ 1.0
+        @test m.velocity[1] ≈ 100.0
+    end
+
+    @testset "Bord droit x > Lx" begin
+        m = Molecule([11.0, 5.0, 5.0], [100.0, 0.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[1] ≈ 9.0
+        @test m.velocity[1] ≈ -100.0
+    end
+
+    @testset "Bord bas y < 0" begin
+        m = Molecule([5.0, -2.0, 5.0], [0.0, -100.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[2] ≈ 2.0
+        @test m.velocity[2] ≈ 100.0
+    end
+
+    @testset "Bord haut y > Ly" begin
+        m = Molecule([5.0, 12.0, 5.0], [0.0, 100.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[2] ≈ 8.0
+        @test m.velocity[2] ≈ -100.0
+    end
+
+    @testset "Bord avant z < 0" begin
+        m = Molecule([5.0, 5.0, -3.0], [0.0, 0.0, -100.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[3] ≈ 3.0
+        @test m.velocity[3] ≈ 100.0
+    end
+
+    @testset "Bord arrière z > Lz" begin
+        m = Molecule([5.0, 5.0, 13.0], [0.0, 0.0, 100.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[3] ≈ 7.0
+        @test m.velocity[3] ≈ -100.0
+    end
+
+    @testset "Coin x et y simultanément" begin
+        m = Molecule([-1.0, -2.0, 5.0], [-100.0, -100.0, 0.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position[1] ≈ 1.0
+        @test m.position[2] ≈ 2.0
+        @test m.velocity[1] ≈ 100.0
+        @test m.velocity[2] ≈ 100.0
+    end
+
+    @testset "Pas de sortie" begin
+        m = Molecule([5.0, 5.0, 5.0], [100.0, 100.0, 100.0], 6.6465e-27, 1.40e-10, "He")
+        applyBoundaries(m, domain)
+        @test m.position ≈ [5.0, 5.0, 5.0]
+        @test m.velocity ≈ [100.0, 100.0, 100.0]
+    end
+
+end
+
+# ╔═╡ 06bcf237-ccc7-411a-b9e9-f8cff71b8fd4
+md"""
+## 7 Première simulation d'un gaz d'Helium
+
+Première simulation multi agents. Les atômes sont initialisés de façon random dans le domaine. Chaque atome sera initialisé aà la même vitesse mais avec des positions aléatoires.
+
+Conditions initiales de la simulation :
+- Domaine de simulation (m) : [−5 · 10−9, 5 · 10−9] × [−5 · 10−9, 5 · 10−9] × [−5 · 10−9, 5 · 10−9]
+- Masse de l'hélium (kg) : 6.646 · 10−27
+- Rayon de l'hélium - modèle hard sphere (m) : 1.1 · 10−10
+- Nombre d'atomes : 400
+- Vitesse initiale de chaque atome (m/s) : 1400
+- Pas de temps (s) : 1 · 10−14
+- Temps nal (s) : 2 · 10−1
+"""
+
+# ╔═╡ f04d6d55-c7e8-4437-8d9e-1c1bc8acf8a3
+md"""
+### 7.1
+Faites une animation illustrant le comportement des atomes de cette simulation.
+
+### 7.2 :
+Calculez puis affichez l'évolution de la vitesse moyenne des atomes au cours du temps. Comment cette vitesse évolue-t-elle au sain de la simulation ?
+"""
+
+# ╔═╡ f00cee09-d424-4b57-986e-0215dde37cc0
+function initaliseGasAtRandom(N::Int, domaine::Domain, moleculesPrototypes::Vector{Molecule}, initialSpeed::Float64)
+	final_molecules = Molecule[]
+	v = randn(3)
+
+	
+	for i in 1:N
+		# Vecteur gaussien aléatoire
+		random_speed = randn(3)
+		random_speed = random_speed / norm(random_speed) * initialSpeed
+
+		random_position = rand(3) .* domaine.L
+		
+		prototype = rand(moleculesPrototypes)
+		m = Molecule(random_position, random_speed, prototype.mass, prototype.radius, prototype.formula)
+		push!(final_molecules, m)
+	end
+
+	return final_molecules
+end
+
+# ╔═╡ 4ffc6f10-cc9c-4572-84e7-fa63deac5ca5
+function simulate(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64)
+    mean_speeds = []
+    times = []
+    alphas = []
+    betas = []
+    
+    @gif for t in 0:dt:finalTime 
+        current_speed_sum = 0.0
+        for molecule in molecules
+            computeNextPosition(molecule, dt)
+            applyBoundaries(molecule, domain)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+            current_speed_sum += norm(molecules[i].velocity)
+        end
+        push!(mean_speeds, current_speed_sum / length(molecules))
+        push!(times, t)
+        alpha = He.mass * mean(norm.(getfield.(molecules, :velocity)).^2) / (3 * 1.380649e-23)
+push!(alphas, alpha)
+        beta = length(molecules) * He.mass * mean([norm(m.velocity)^2 for m in molecules]) / (3 * domainVolume(domain))
+push!(betas, beta)
+        p1 = scatter([m.position[1] for m in molecules], [m.position[2] for m in molecules], xlims=(0, domain.L[1]), ylims=(0, domain.L[2]), legend=false, title="Positions")
+
+        p2 = plot(times, mean_speeds, xlabel="t", ylabel="v moyenne", legend=false, title="Vitesse moyenne",
+    ylims=(0, 2000), xlims=(0, 10e-11))
+        plot(p1, p2, layout=(1,2))
+    end every 100
+end
+
+# ╔═╡ 17f7570b-318a-4582-bcff-d2230c49013a
+begin
+	domain = Domain([10e-9, 10e-9, 10e-9])
+	moleculesRandom = initaliseGasAtRandom(400, domain, [He], 1400.0)
+	simulate(moleculesRandom, domain, 1e-14, 1e-10)
+end
+
+# ╔═╡ 2eae66aa-4497-4b74-b629-76f40d269728
+md"""
+#### Analyse
+
+Elle commence par descendre légérement puis à se stabiliser. Cette stabilité c'est l'équilibre thermodynamique. Les grandeurs macroscopiques comme la vitesse moyennes ne varient plus.
+"""
+
+# ╔═╡ c7efe043-a7dc-4217-8fb9-d20bcd3ed36f
+md"""
+### 7.3
+Affichez la distribution de la magnitude de la vitesse des atomes au temps final. Qu'observez-vous ?
+
+Selon l'histograme, on observe une distribution de Maxwell-Botzmann. Elle suit une courbe en cloche mais n'est pas symétrique dans sa moyenne. Elle possède une borne à gauche car elle peut pas être négative et la queue est plus longue à droite.
+"""
+
+# ╔═╡ 205df3c6-ff87-458c-8b65-232bd38a0f6b
+histogram([norm(m.velocity) for m in moleculesRandom], 
+    xlabel="v (m/s)", ylabel="nombre d'atomes", 
+    legend=false, title="Distribution des vitesses")
+
+# ╔═╡ 9de0000d-0399-4c9a-9ae4-74a386e06932
+md"""
+### 7.4
+
+Calculez puis affichez α au cours du temps. Comment évolue α au cours du temps ? Qu'est-ce que α peut représenter
+physiquement et quelle est son unité ?
+
+$$α = \frac{m <v2>}{3kb}$$
+avec m la masse des atomes, < v2 > la moyenne des vitesses au carrées et kb = 1.380649·10−23(J/K) la constante
+de Boltzmann.
+
+C'est la température en Kelvins [K]
+"""
+
+# ╔═╡ a2bf77de-0cbc-480c-899e-2a2892dcca56
+md"""
+### 7.5
+
+Calculez puis achez β au cours du temps. Comment évolue β au cours du temps ? Qu'est-ce que β peut représenter
+physiquement et quelle est son unité ?
+β = N m < v2 >
+3V
+
+$$\beta = \frac{Nm <v2>}{3V}$$
+
+avec N le nombre d'atome dans le domaine, m la masse des atomes, < v2 > la moyenne des vitesses au carrées
+et V le volume de ce domaine.
+
+C'est la pression en Pascal [Pa]
+
+"""
+
+# ╔═╡ 54811911-1303-4acb-a666-7bb72dcf3ebb
+md"""
+## 8 Ajout de la gravité
+
+La gravité est une force volumique agissant sur l'ensemble des atomes, même si son effet et est extrêmement faible à l'échelle microscopique. L'objectif est de comprendre quand et comment la gravité peut modifier la répartition spatiale d'un gaz.
+
+### 8.1 :
+Dans votre méthode computeNextPosition, ajoutez l'influence de la gravité. Cette force suivra l'axe z.
+"""
+
+# ╔═╡ b7b7b4e9-a125-47e3-8054-5ecf5b21d704
+function computeNextPositionGravity(molecule::Molecule, dt::Float64, gravity::Vector{Float64})
+	molecule.position .+= molecule.velocity .* dt .+ 0.5 .* gravity .* dt^2
+	molecule.velocity .+= gravity .* dt
+end
+
+# ╔═╡ 1ed02f4a-6ba4-416c-8554-7b7d71e04368
+md"""
+### 8.4 
+Vous simulez la même configuration que précédemment (partie 7) mais avec ces changements.
+
+Conditions initiales de la simulation
+- Domaine de simulation (m) : [−1 · 10−8, 1 · 10−8] × [−1 · 10−8, 1 · 10−8] × [−1 · 10−8, 1 · 10−8]
+- Nombre d'atomes : 500
+- Vitesse initiale de chaque atome (m/s) : 1367
+- Temps nal (s) : 5 · 10−11
+- g (m/s2) : 9.81 · 1013
+
+Afin de pouvoir visualiser dans un temps respectable l'influuence de la gravité sur la répartition, celle-ci sera très fortement exagérée. Comment évolue cette probabilité de présence en fonction de l'altitude ?
+
+-> point 8.2
+"""
+
+# ╔═╡ 431388d3-71a6-4187-8476-a4a939fbfa37
+function simulateWithGravity(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, gravity::Vector{Float64})
+    mean_speeds = []
+    times = []
+    alphas = []
+    betas = []
+    
+    @gif for t in 0:dt:finalTime 
+        current_speed_sum = 0.0
+        for molecule in molecules
+            computeNextPositionGravity(molecule, dt, gravity)
+            applyBoundaries(molecule, domain)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+            current_speed_sum += norm(molecules[i].velocity)
+        end
+        push!(mean_speeds, current_speed_sum / length(molecules))
+        push!(times, t)
+        alpha = He.mass * mean(norm.(getfield.(molecules, :velocity)).^2) / (3 * 1.380649e-23)
+push!(alphas, alpha)
+        beta = length(molecules) * He.mass * mean([norm(m.velocity)^2 for m in molecules]) / (3 * domainVolume(domain))
+push!(betas, beta)
+        p1 = scatter([m.position[1] for m in molecules], [m.position[2] for m in molecules], xlims=(0, domain.L[1]), ylims=(0, domain.L[2]), legend=false, title="Positions")
+        plot(p1, layout=(1,1))
+    end every 100
+end
+
+# ╔═╡ 402cdb02-9388-4efe-b25b-c05fdbf494fc
+begin
+	domain8 = Domain([20e-9, 20e-9, 20e-9])
+	molecules8 = initaliseGasAtRandom(500, domain8, [He], 1367.0)
+	simulateWithGravity(molecules8, domain8, 1e-14, 5e-11, [0.0, 0.0, -9.81e13])
+end
+
+# ╔═╡ 7bb387ab-f469-4179-8733-912203ba94b0
+md"""
+
+### 8.2
+
+Afin d'observer l'effet de la gravité dans votre simulation, implémentez l'affichage d'un graphique représentant
+
+l'évolution de la probabilité de présence des particules en fonction de z.
+
+On observe une décroissance exponnentielle à cause de la gravité, plus l'axe z est élevé, moins c'est probable da'voir des particules présentes.
+"""
+
+# ╔═╡ 8047a34e-aec3-47da-8f82-6924d6d6895d
+histogram([m.position[3] for m in molecules8], 
+    normalize=true,
+    xlabel="z (m)", ylabel="probabilité", 
+    legend=false, title="Probabilité de présence en z")
+
+# ╔═╡ f3d01dff-1774-4cad-8829-652bbf4cba9b
+md"""
+### 8.3
+La vitesse de gravité est modélisée par le coeficient suivant
+
+$$v_{grav} = \frac{mgD}{kbT}$$
+
+avec m la masse de la molécule, g la constante de gravité, D un coeficient de diffusion (6.5 · 10−5 m2/s), kb la constant de Boltzmann et T la température.
+Combien de temps faudrait-il à une molécule d'Hélium pour parcourir une mètre de distance due uniquement à la force de gravité pour une température de 26.85 ◦C ?
+
+Temps pour parcourir 1 mètre :
+
+$$t = \frac{d}{v_{grav}} = \frac{1}{v_{grav}}$$
+"""
+
+# ╔═╡ 4e987429-a0b3-45ae-b973-396afb05f951
+begin
+m = 6.646e-27
+g = 9.81
+D = 6.5e-5
+kb = 1.380649e-23
+T = 273.15 + 26.85
+
+v_grav = (m * g * D) / (kb * T)
+t = 1 / v_grav
+println("v_grav = $v_grav m/s")
+println("t = $t s")
+end
+
+# ╔═╡ c47a9bf4-6b63-4551-8db2-e5e692294908
+md"""
+### 8.5
+Qu'est-ce que la turbopause ? Quel mécanisme physique permet d'expliquer cette limite ?
+
+La turbopause c'est la limite dans l'athmosphère terrestre qui sépare deux régions, elle se situe à 100km d'altitude :
+
+En dessous (homosphère): Grâce au méange athmosphérique, la composition des gaz reste homogène, les différents types sont mélangés indépendamment de leur masse.
+
+Au dessus (hétérosphère): le mélange disparait et chaque type se distribue selon sa propre masse suivant la loi barométique :
+
+$$n(z) = n_0 \cdot e^{-\frac{mgz}{k_BT}}$$
+
+La complession entre les deux effets suivants :
+- L'agitation thermique qui tend à mélanger uniformément les gaz
+- La gravité qui tend à séparer les espèces selon leur masse (les plus lourdes en bas, les plus légères en haut)
+
+En dessous de la turbopause, la turbulence domine et homogénéise. Au dessus, la gravité domine et les espèces se séparent.
+"""
+
+# ╔═╡ 3f5235ca-9adf-4e9d-b6f1-22ea36606712
+md"""
+### 8.6
+Dans le même esprit que la question 8.3, affichez l'évolution de la pression en fonction z. Que se passe-t-il ?
+
+La pression décroit exponnentiellement avec l'altitude
+"""
+
+# ╔═╡ d056e4e7-29cb-4db5-864c-e255415064a0
+histogram([m.position[3] for m in molecules8],
+    weights=[norm(m.velocity)^2 for m in molecules8] .* He.mass / (3 * domainVolume(domain8)),
+    normalize=false,
+    xlabel="z (m)", ylabel="pression (Pa)",
+    legend=false, title="Pression en fonction de z")
+
+# ╔═╡ f71e8ecb-e04a-4df3-9568-f3d946b0ec60
+md"""
+## 9 Simulation multi-espèces (He-Ar)
+Dans cette partie, vous allez simuler un système composé de plusieurs espèces atomiques. Cette simulation consid-
+érera un mélange d'atomes d'hélium (He) et d'argon (Ar), initialisés aléatoirement dans le domaine de simulation.
+
+L'objectif est d'étudier l'inuence de la masse/taille des particules sur leur dynamique, leur répartition spatiale et les grandeurs thermodynamiques du système.
+
+Conditions initiales de la simulation :
+	- Domaine de simulation (m) : [−1 · 10−8, 1 · 10−8] × [−1 · 10−8, 1 · 10−8] × [−1 · 10−8, 1 · 10−8]
+	- Pas de temps (s) : 1 · 10−14
+	- Temps nal (s) : 5 · 10−11
+	- g (m/s2) : 9.81 · 1013
+	- Hélium :
+	- Masse de l'hélium (kg) : 6.646 · 10−27
+	- Rayon de l'hélium - modèle hard sphere (m) : 1.1 · 10−10
+	- Nombre d'atomes d'hélium : 400
+	- Vitesse initiale des atomes d'héliun (m/s) : 789.45
+- Argon :
+	- Masse de l'Argon (kg) : 6.634 · 10−26
+	- Rayon de l'Argon - modèle hard sphere (m) : 1.88 · 10−10
+	- Nombre d'atomes d'Argon : 200
+	- Vitesse initiale des atomes d'Argon (m/s) : 249.88
+
+## 9.1
+Réalisez la simulation correspondant à ces conditions initiales et produisez une animation illustrant l'évolution du système. Afin de distinguer clairement les deux espèces, utilisez une couleur différente pour les atomes d'hélium et d'argon.
+"""
+
+# ╔═╡ 6835f289-57cd-44cd-a5f3-32cf0f8232ba
+ function simulateWithMultiSpicies(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, gravity::Vector{Float64})
+    mean_speeds = []
+    times = []
+    
+    @gif for t in 0:dt:finalTime 
+        current_speed_sum = 0.0
+        for molecule in molecules
+            computeNextPositionGravity(molecule, dt, gravity)
+            applyBoundaries(molecule, domain)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+            current_speed_sum += norm(molecules[i].velocity)
+        end
+        push!(mean_speeds, current_speed_sum / length(molecules))
+        push!(times, t)
+        p1 = scatter([m.position[1] for m in molecules if m.formula == "He"],
+             [m.position[2] for m in molecules if m.formula == "He"],
+             color=:blue, label="He", xlims=(0, domain.L[1]), ylims=(0, domain.L[2]))
+scatter!(p1, [m.position[1] for m in molecules if m.formula == "Ar"],
+             [m.position[2] for m in molecules if m.formula == "Ar"],
+             color=:red, label="Ar")
+plot(p1)
+    end every 100
+end
+
+# ╔═╡ 1347075f-4dd5-4b72-9ad7-ab49d6f99621
+begin
+    Ar = Molecule([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 6.634e-26, 1.88e-10, "Ar")
+    
+    domain9 = Domain([20e-9, 20e-9, 20e-9])
+    molecules9 = vcat(
+        initaliseGasAtRandom(400, domain9, [He], 789.45),
+        initaliseGasAtRandom(200, domain9, [Ar], 249.88)
+    )
+    simulateWithMultiSpicies(molecules9, domain9, 1e-14, 5e-11, [0.0, 0.0, -9.81e13])
+end
+
+# ╔═╡ 855ace40-74b1-4aa3-b345-a9b4c23d8173
+md"""
+### 9.2
+Afin d'analyser l'effet de la gravité sur chaque espèce, calculez et affichez l'évolution de la probabilité de présence des particules en fonction de l'altitude z. Cette analyse devra être exectuée séparément pour l'hélium et pour l'argon.
+"""
+
+# ╔═╡ e28de34a-99c6-4c34-94b9-dcdaa11d2eef
+begin
+p_he = histogram([m.position[3] for m in molecules9 if m.formula == "He"],
+    normalize=true, color=:blue, label="He",
+    xlabel="z (m)", ylabel="probabilité")
+
+p_ar = histogram([m.position[3] for m in molecules9 if m.formula == "Ar"],
+    normalize=true, color=:red, label="Ar",
+    xlabel="z (m)", ylabel="probabilité")
+
+plot(p_he, p_ar, layout=(1,2))
+end
+
+# ╔═╡ 7078bc83-93c7-4736-b407-fa665aa78c02
+md"""
+### 9.3
+Expliquez la différence physique entre les grandeurs moyennes < v2 > et < mv2 > ?
+
+La moyenne des carrées des vitesses -> grandeur cinématique
+
+$$<v^2>$$ 
+
+La moyenne des corrées de la vitesse pondérée par la masse -> grandeur énergétique
+
+$$<mv^2>$$
+
+Différence : L'équilibre fondamentale : à l0équilibre thermodynmaique, deux expèces différentes ont la même valeur de $$<mv^2>$$ mais la $$<v^2>$$ sont différentes car les molécules plus lourdes se déplacent plus lentement. -> Principe d0équiparatition de l'énergie.
+"""
+
+# ╔═╡ b9eb2927-b1fd-41d4-be8c-9d633eb7bbff
+md"""
+### 9.4
+Calculez et représentez l'évolution en fonction de z des grandeurs suivantes : : < mv2 >, p et T en fonction de z.
+"""
+
+# ╔═╡ eb953969-6e32-47cd-afa3-22e324ed32ea
+begin
+weights_he = [m.mass * norm(m.velocity)^2 for m in molecules9 if m.formula == "He"]
+weights_ar = [m.mass * norm(m.velocity)^2 for m in molecules9 if m.formula == "Ar"]
+z_he = [m.position[3] for m in molecules9 if m.formula == "He"]
+z_ar = [m.position[3] for m in molecules9 if m.formula == "Ar"]
+end
+
+# ╔═╡ bf9992bc-5637-4fc4-9bc0-4332b64bfdbc
+begin
+    p1 = histogram(z_he, weights=weights_he, color=:blue, label="He", title="<mv²>", alpha=0.5)
+    histogram!(p1, z_ar, weights=weights_ar, color=:red, label="Ar", alpha=0.5)
+    plot(p1)
+end
+
+# ╔═╡ d68b317d-fcd5-45bf-abef-e487b8a5d591
+begin
+p2 = histogram(z_he, weights=weights_he ./ (3*domainVolume(domain9)), color=:blue, label="He", title="Pression", alpha=0.5)
+histogram!(p2, z_ar, weights=weights_ar ./ (3*domainVolume(domain9)), color=:red, label="Ar", alpha=0.5)
+
+plot(p2)
+end
+
+# ╔═╡ 3150f9cb-d3c6-4a47-872b-ecf879dc3032
+begin
+p3 = histogram(z_he, weights=weights_he ./ (3*1.380649e-23), color=:blue, label="He", title="Température", alpha=0.5)
+histogram!(p3, z_ar, weights=weights_ar ./ (3*1.380649e-23), color=:red, label="Ar", alpha=0.5)
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
@@ -380,7 +969,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "4629b51bdbe2ba032a039c84c80dbb24ea7bd996"
+project_hash = "400edb41e68664628cd3ca53ea85b10e181c109c"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -1520,5 +2109,50 @@ version = "1.13.0+0"
 # ╠═7c60fb05-85f0-4fe8-a9a0-8c59f9706f38
 # ╠═f53cb4ae-5b48-4f15-bd9b-f707dc8a3fc6
 # ╠═eaa968af-d013-4d16-b62f-713500a68b18
+# ╠═b2ca41ad-c8b8-423e-a75f-56bd2b737890
+# ╠═375c8598-0034-445e-b3e8-bcd58a471c5f
+# ╠═22b1998c-045d-4d0b-9ca8-40ab8c208d95
+# ╠═e018bcc6-5f90-429f-a749-6b4011dfbad4
+# ╠═6b2dc248-8208-47fd-987c-5c1726127353
+# ╠═c6e70817-cebf-4ac8-bf11-79df05a39e6c
+# ╠═ff8a5c41-8ec5-4208-a1d8-165dfb6e9d99
+# ╠═8c2b6820-8a02-4879-afe5-3b35cebe1ea8
+# ╠═40d672a8-4dee-48f7-a241-5e14df293bc2
+# ╠═ab3d206c-35d9-40ef-8154-3c1cc6b6fc4e
+# ╠═aff6073d-d727-4b0e-b3b2-166b2175e72e
+# ╠═06bcf237-ccc7-411a-b9e9-f8cff71b8fd4
+# ╠═f04d6d55-c7e8-4437-8d9e-1c1bc8acf8a3
+# ╠═f00cee09-d424-4b57-986e-0215dde37cc0
+# ╠═e575895b-63ef-44b2-9265-aac1af08cb60
+# ╠═4ffc6f10-cc9c-4572-84e7-fa63deac5ca5
+# ╠═17f7570b-318a-4582-bcff-d2230c49013a
+# ╠═2eae66aa-4497-4b74-b629-76f40d269728
+# ╠═c7efe043-a7dc-4217-8fb9-d20bcd3ed36f
+# ╠═205df3c6-ff87-458c-8b65-232bd38a0f6b
+# ╠═9de0000d-0399-4c9a-9ae4-74a386e06932
+# ╠═a2bf77de-0cbc-480c-899e-2a2892dcca56
+# ╠═54811911-1303-4acb-a666-7bb72dcf3ebb
+# ╠═b7b7b4e9-a125-47e3-8054-5ecf5b21d704
+# ╠═1ed02f4a-6ba4-416c-8554-7b7d71e04368
+# ╠═431388d3-71a6-4187-8476-a4a939fbfa37
+# ╠═402cdb02-9388-4efe-b25b-c05fdbf494fc
+# ╠═7bb387ab-f469-4179-8733-912203ba94b0
+# ╠═8047a34e-aec3-47da-8f82-6924d6d6895d
+# ╠═f3d01dff-1774-4cad-8829-652bbf4cba9b
+# ╠═4e987429-a0b3-45ae-b973-396afb05f951
+# ╠═c47a9bf4-6b63-4551-8db2-e5e692294908
+# ╠═3f5235ca-9adf-4e9d-b6f1-22ea36606712
+# ╠═d056e4e7-29cb-4db5-864c-e255415064a0
+# ╠═f71e8ecb-e04a-4df3-9568-f3d946b0ec60
+# ╠═6835f289-57cd-44cd-a5f3-32cf0f8232ba
+# ╠═1347075f-4dd5-4b72-9ad7-ab49d6f99621
+# ╠═855ace40-74b1-4aa3-b345-a9b4c23d8173
+# ╠═e28de34a-99c6-4c34-94b9-dcdaa11d2eef
+# ╠═7078bc83-93c7-4736-b407-fa665aa78c02
+# ╠═b9eb2927-b1fd-41d4-be8c-9d633eb7bbff
+# ╠═eb953969-6e32-47cd-afa3-22e324ed32ea
+# ╠═bf9992bc-5637-4fc4-9bc0-4332b64bfdbc
+# ╠═d68b317d-fcd5-45bf-abef-e487b8a5d591
+# ╠═3150f9cb-d3c6-4a47-872b-ecf879dc3032
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

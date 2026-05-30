@@ -16,6 +16,9 @@ using Test
 # ╔═╡ e575895b-63ef-44b2-9265-aac1af08cb60
 using Statistics
 
+# ╔═╡ cec34ee7-b494-4607-820c-4be5f76539e9
+using StatsBase
+
 # ╔═╡ e69a6728-e8ee-4a23-afc4-08dc8aafa669
 md"""
 
@@ -562,48 +565,6 @@ function initaliseGasAtRandom(N::Int, domaine::Domain, moleculesPrototypes::Vect
 	return final_molecules
 end
 
-# ╔═╡ 4ffc6f10-cc9c-4572-84e7-fa63deac5ca5
-function simulate(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64)
-    mean_speeds = []
-    times = []
-    alphas = []
-    betas = []
-    
-    @gif for t in 0:dt:finalTime 
-        current_speed_sum = 0.0
-        for molecule in molecules
-            computeNextPosition(molecule, dt)
-            applyBoundaries(molecule, domain)
-        end
-        for i in 1:length(molecules)
-            for j in i+1:length(molecules)
-                if detectCollision(molecules[i], molecules[j])
-                    computeCollision(molecules[i], molecules[j])
-                end
-            end
-            current_speed_sum += norm(molecules[i].velocity)
-        end
-        push!(mean_speeds, current_speed_sum / length(molecules))
-        push!(times, t)
-        alpha = He.mass * mean(norm.(getfield.(molecules, :velocity)).^2) / (3 * 1.380649e-23)
-push!(alphas, alpha)
-        beta = length(molecules) * He.mass * mean([norm(m.velocity)^2 for m in molecules]) / (3 * domainVolume(domain))
-push!(betas, beta)
-        p1 = scatter([m.position[1] for m in molecules], [m.position[2] for m in molecules], xlims=(0, domain.L[1]), ylims=(0, domain.L[2]), legend=false, title="Positions")
-
-        p2 = plot(times, mean_speeds, xlabel="t", ylabel="v moyenne", legend=false, title="Vitesse moyenne",
-    ylims=(0, 2000), xlims=(0, 10e-11))
-        plot(p1, p2, layout=(1,2))
-    end every 100
-end
-
-# ╔═╡ 17f7570b-318a-4582-bcff-d2230c49013a
-begin
-	domain = Domain([10e-9, 10e-9, 10e-9])
-	moleculesRandom = initaliseGasAtRandom(400, domain, [He], 1400.0)
-	simulate(moleculesRandom, domain, 1e-14, 1e-10)
-end
-
 # ╔═╡ 2eae66aa-4497-4b74-b629-76f40d269728
 md"""
 #### Analyse
@@ -618,11 +579,6 @@ Affichez la distribution de la magnitude de la vitesse des atomes au temps final
 
 Selon l'histograme, on observe une distribution de Maxwell-Botzmann. Elle suit une courbe en cloche mais n'est pas symétrique dans sa moyenne. Elle possède une borne à gauche car elle peut pas être négative et la queue est plus longue à droite.
 """
-
-# ╔═╡ 205df3c6-ff87-458c-8b65-232bd38a0f6b
-histogram([norm(m.velocity) for m in moleculesRandom], 
-    xlabel="v (m/s)", ylabel="nombre d'atomes", 
-    legend=false, title="Distribution des vitesses")
 
 # ╔═╡ 9de0000d-0399-4c9a-9ae4-74a386e06932
 md"""
@@ -690,6 +646,8 @@ Afin de pouvoir visualiser dans un temps respectable l'influuence de la gravité
 """
 
 # ╔═╡ 431388d3-71a6-4187-8476-a4a939fbfa37
+# ╠═╡ disabled = true
+#=╠═╡
 function simulateWithGravity(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, gravity::Vector{Float64})
     mean_speeds = []
     times = []
@@ -720,13 +678,7 @@ push!(betas, beta)
         plot(p1, layout=(1,1))
     end every 100
 end
-
-# ╔═╡ 402cdb02-9388-4efe-b25b-c05fdbf494fc
-begin
-	domain8 = Domain([20e-9, 20e-9, 20e-9])
-	molecules8 = initaliseGasAtRandom(500, domain8, [He], 1367.0)
-	simulateWithGravity(molecules8, domain8, 1e-14, 5e-11, [0.0, 0.0, -9.81e13])
-end
+  ╠═╡ =#
 
 # ╔═╡ 7bb387ab-f469-4179-8733-912203ba94b0
 md"""
@@ -739,12 +691,6 @@ l'évolution de la probabilité de présence des particules en fonction de z.
 
 On observe une décroissance exponnentielle à cause de la gravité, plus l'axe z est élevé, moins c'est probable da'voir des particules présentes.
 """
-
-# ╔═╡ 8047a34e-aec3-47da-8f82-6924d6d6895d
-histogram([m.position[3] for m in molecules8], 
-    normalize=true,
-    xlabel="z (m)", ylabel="probabilité", 
-    legend=false, title="Probabilité de présence en z")
 
 # ╔═╡ f3d01dff-1774-4cad-8829-652bbf4cba9b
 md"""
@@ -803,13 +749,6 @@ Dans le même esprit que la question 8.3, affichez l'évolution de la pression e
 La pression décroit exponnentiellement avec l'altitude
 """
 
-# ╔═╡ d056e4e7-29cb-4db5-864c-e255415064a0
-histogram([m.position[3] for m in molecules8],
-    weights=[norm(m.velocity)^2 for m in molecules8] .* He.mass / (3 * domainVolume(domain8)),
-    normalize=false,
-    xlabel="z (m)", ylabel="pression (Pa)",
-    legend=false, title="Pression en fonction de z")
-
 # ╔═╡ f71e8ecb-e04a-4df3-9568-f3d946b0ec60
 md"""
 ## 9 Simulation multi-espèces (He-Ar)
@@ -839,6 +778,8 @@ Réalisez la simulation correspondant à ces conditions initiales et produisez u
 """
 
 # ╔═╡ 6835f289-57cd-44cd-a5f3-32cf0f8232ba
+# ╠═╡ disabled = true
+#=╠═╡
  function simulateWithMultiSpicies(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, gravity::Vector{Float64})
     mean_speeds = []
     times = []
@@ -868,37 +809,13 @@ scatter!(p1, [m.position[1] for m in molecules if m.formula == "Ar"],
 plot(p1)
     end every 100
 end
-
-# ╔═╡ 1347075f-4dd5-4b72-9ad7-ab49d6f99621
-begin
-    Ar = Molecule([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 6.634e-26, 1.88e-10, "Ar")
-    
-    domain9 = Domain([20e-9, 20e-9, 20e-9])
-    molecules9 = vcat(
-        initaliseGasAtRandom(400, domain9, [He], 789.45),
-        initaliseGasAtRandom(200, domain9, [Ar], 249.88)
-    )
-    simulateWithMultiSpicies(molecules9, domain9, 1e-14, 5e-11, [0.0, 0.0, -9.81e13])
-end
+  ╠═╡ =#
 
 # ╔═╡ 855ace40-74b1-4aa3-b345-a9b4c23d8173
 md"""
 ### 9.2
 Afin d'analyser l'effet de la gravité sur chaque espèce, calculez et affichez l'évolution de la probabilité de présence des particules en fonction de l'altitude z. Cette analyse devra être exectuée séparément pour l'hélium et pour l'argon.
 """
-
-# ╔═╡ e28de34a-99c6-4c34-94b9-dcdaa11d2eef
-begin
-p_he = histogram([m.position[3] for m in molecules9 if m.formula == "He"],
-    normalize=true, color=:blue, label="He",
-    xlabel="z (m)", ylabel="probabilité")
-
-p_ar = histogram([m.position[3] for m in molecules9 if m.formula == "Ar"],
-    normalize=true, color=:red, label="Ar",
-    xlabel="z (m)", ylabel="probabilité")
-
-plot(p_he, p_ar, layout=(1,2))
-end
 
 # ╔═╡ 7078bc83-93c7-4736-b407-fa665aa78c02
 md"""
@@ -922,6 +839,472 @@ md"""
 Calculez et représentez l'évolution en fonction de z des grandeurs suivantes : : < mv2 >, p et T en fonction de z.
 """
 
+# ╔═╡ 77a04d8c-c3c2-4fc5-8673-ea206a6b4d73
+md"""
+## 10 Critère de stabilité d'une simulation physique
+
+Dans une simulation multi-agents, les trajectoires individuelles des atomes évoluent en permanence et ne se sta-
+bilisent complètement. Cependant, certaines grandeurs statistiques globales du système, telles que < mv2 >, p
+et T , peuvent atteindre un régime stationnaire au-delà duquel elles ne présentent plus que de faibles fuctuations
+autour d'une valeur moyenne.
+Cette stabilisation permet de définir un critère de stabilité (ou de convergence) et de considérer que le système
+a atteint un état d'équilibre statistique. Un tel critère est essentiel afin de déterminer si une simulation a été menée sur un temps suffisamment long pour produire des résultats physiquement pertinents.
+"""
+
+# ╔═╡ d7d821a0-e809-4d09-b0fc-f2cab5a970c7
+md"""
+### 10.1 
+Proposez un ou plusieurs critères permettant d'évaluer la stabilité d'une simulation physique.
+
+Écart-type relatif : on calcule l'écart-type de la grandeur (T, p, < mv² >) sur une fenêtre glissante des N derniers pas de temps. Si σ/μ < seuil (ex. 5%), le système est stable.
+
+$$\frac{\sigma}{\micro} < \epsilon$$
+"""
+
+# ╔═╡ e617fe99-22c3-4f21-843c-7c3c3a086d97
+md"""
+### 10.2
+Implémentez et testez au moins un des critères proposés sur l'une des simulations réalisées précédemment. Analysez
+son évolution au cours du temps et discutez de sa pertinence pour juger de la convergence du système
+"""
+
+# ╔═╡ fda906ad-394f-4b72-9f2f-cef7a5821b22
+function simulateCollectStats(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, gravity::Vector{Float64})
+    alphas = []
+    times = []
+    
+    for t in 0:dt:finalTime 
+        for molecule in molecules
+            computeNextPositionGravity(molecule, dt, gravity)
+            applyBoundaries(molecule, domain)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+        end
+        alpha = mean([m.mass * norm(m.velocity)^2 for m in molecules]) / (3 * 1.380649e-23)
+        push!(alphas, alpha)
+        push!(times, t)
+    end
+    
+    return times, alphas
+end
+
+# ╔═╡ 8fb8ce4e-ea89-4008-a5fa-99be6205fafc
+md"""
+## 11 Distribution de ???
+
+### 11.1 :
+La probabilité de présence en fonction de la coordonnée z présente une forme caractéristique. Quelle est cette distribution ? 
+
+La distribution de Boltzmann.
+
+La loi de Boltzmann s'écrit :
+$$P(\text{état}) \propto e^{-\frac{E}{k_BT}}$$
+
+Quels paramètres physiques influencent la forme de cette distribution et de quelle manière ?
+
+La temperature `T`, plut `T` est elevée, plus loa distrubution est étalée.
+
+L'énergie `E`, selon le contexte
+
+Pour la distribution spatiale : $E = mgz$ (énergie potentielle)  
+
+Pour la distribution des vitesses $E = \frac{mv^2}{2}$
+
+Plus E croît vite, plus la distribution décroit vite.
+
+$$\frac{E}{k_BT}$$
+
+C'est la compétition entre l'énergie du système et l'agitation thermique
+
+### 11.2 :
+Quelles grandeurs thermodynamiques obéissent à cette même loi de distribution ? Expliquez pourquoi.
+
+Les grandeurs qui obéissent à cette loi :
+
+**Densité de particules :**
+$$n(z) = n_0 \cdot e^{-\frac{mgz}{k_BT}}$$
+
+**Pression :**
+$$P(z) = P_0 \cdot e^{-\frac{mgz}{k_BT}}$$
+
+**Distribution des vitesses (Maxwell) :**
+$$p(v) = C \cdot e^{-\frac{mv^2}{2k_BT}}$$
+
+"""
+
+# ╔═╡ ead9a443-4aa3-4a45-9a14-e028e9862dc7
+md"""
+## 12 Entropie de Shannon
+
+Probabilité d'apparition en un point x.
+
+$$H(x) = -\sum{P(x)log_2(P(x))}$$
+
+Dans le cas à quatre variables indépendantes, cette fonction peut s'écrire sous la forme suivante
+
+$$H(X, Y, Z, <v^2>) = H(X) + H(Y) + H(Z) + H(<v^2>)$$
+"""
+
+# ╔═╡ 2be52041-7d82-40e5-b62b-301ac0bf59b5
+md"""
+## 12.1 :
+Implémentez le calcul de cette information en fonction des distributions de probabilité pour les variables aléatoires : x, y, z et < v2 >. Les distributions spatiales doivent être divisées en 10. La distribution de < v2 > doit être
+divisée en 200 sur le domaine [0; 200000] (m2/s2).
+"""
+
+# ╔═╡ 1c2bd9bc-c679-4b41-8a8d-fbb79556c1a9
+function entropy(hist)
+        p = hist.weights / sum(hist.weights)
+        return -sum(p[p .> 0] .* log2.(p[p .> 0]))
+    end
+
+# ╔═╡ d28f93f2-db90-4658-95c4-39297f1cb7ac
+function shannonEntropy(molecules::Vector{Molecule}, domain::Domain, nx_bins::Int=10)
+    x_hist = fit(Histogram, [m.position[1] for m in molecules], range(0, domain.L[1], length=nx_bins+1))
+    y_hist = fit(Histogram, [m.position[2] for m in molecules], range(0, domain.L[2], length=11))
+    z_hist = fit(Histogram, [m.position[3] for m in molecules], range(0, domain.L[3], length=11))
+    
+    # Distribution de <v²> (200 bins sur [0, 200000])
+    v2_hist = fit(Histogram, [norm(m.velocity)^2 for m in molecules], range(0, 200000, length=201))
+    
+    return entropy(x_hist) + entropy(y_hist) + entropy(z_hist) + entropy(v2_hist)
+end
+
+# ╔═╡ 158780a9-a947-47c3-9205-0aaae8d4978e
+md"""
+### 12.2 :
+Réalisez la simulation suivante sans l'action de la gravité. Affichez l'évolution de l'entropie au cours du temps.
+Qu'observez-vous ?
+
+Conditions initiales de la simulation
+- Domaine de simulation (m) : [−5 · 10−9, 5 · 10−9] × [−5 · 10−9, 5 · 10−9] × [−5 · 10−9, 5 · 10−9]
+- Masse de l'hélium (kg) : 6.646 · 10−27
+- Rayon de l'hélium - modèle hard sphere (m) : 1.1 · 10−10
+- Nombre d'atomes : 400
+- Position initiale des atomes : [−5 · 10−9, 0] × [−5 · 10−9, 0] × [−5 · 10−9, 0] ( 1
+8 ème de domaine)
+- Vitesse initiale de chaque atome (m/s) : 1400
+- Pas de temps (s) : 1 · 10−14
+- Temps nal (s) : 5 · 10−11
+"""
+
+# ╔═╡ 25290cf7-6296-41fa-80f7-1bf2f47f2450
+function initaliseGasInRegion(N::Int, domain::Domain, prototype::Molecule, initialSpeed::Float64, x_range, y_range, z_range)
+    final_molecules = Molecule[]
+    for i in 1:N
+        random_speed = randn(3)
+        random_speed = random_speed / norm(random_speed) * initialSpeed
+        random_position = [
+            x_range[1] + rand() * (x_range[2] - x_range[1]),
+            y_range[1] + rand() * (y_range[2] - y_range[1]),
+            z_range[1] + rand() * (z_range[2] - z_range[1])
+        ]
+        m = Molecule(random_position, random_speed, prototype.mass, prototype.radius, prototype.formula)
+        push!(final_molecules, m)
+    end
+    return final_molecules
+end
+
+# ╔═╡ c28d8f25-a33f-47df-b728-0e9a899608f6
+molecules12 = initaliseGasInRegion(400, Domain([10e-9, 10e-9, 10e-9]), He, 1400.0, 
+    (0, 5e-9), (0, 5e-9), (0, 5e-9))
+
+# ╔═╡ eb7cfb2b-dd24-4fb8-ac76-aebe082f9c8d
+function simulate12(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64)
+    mean_speeds = []
+    times = []
+    alphas = []
+    betas = []
+    entropies = []
+    
+    @gif for t in 0:dt:finalTime 
+        current_speed_sum = 0.0
+        for molecule in molecules
+            computeNextPosition(molecule, dt)
+            applyBoundaries(molecule, domain)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+            current_speed_sum += norm(molecules[i].velocity)
+        end
+        push!(mean_speeds, current_speed_sum / length(molecules))
+        push!(times, t)
+        entropy = shannonEntropy(molecules, domain)
+        push!(entropies, entropy)
+        alpha = He.mass * mean(norm.(getfield.(molecules, :velocity)).^2) / (3 * 1.380649e-23)
+push!(alphas, alpha)
+        beta = length(molecules) * He.mass * mean([norm(m.velocity)^2 for m in molecules]) / (3 * domainVolume(domain))
+push!(betas, beta)
+        p1 = scatter([m.position[1] for m in molecules], [m.position[2] for m in molecules], xlims=(0, domain.L[1]), ylims=(0, domain.L[2]), legend=false, title="Positions")
+
+        plot(p1)
+    end every 100
+    return times, entropies
+end
+
+# ╔═╡ 2945adb0-86db-4265-93bf-262de9271a05
+function simulateOpening(molecules::Vector{Molecule}, domain::Domain, dt::Float64, nsteps::Int;
+                         nx_bins::Int = 10, animate::Bool = true, save_every::Int = 100)
+    times     = Float64[]
+    entropies = Float64[]
+
+    function record!(k)
+        for m in molecules
+            computeNextPosition(m, dt)            # mouvement libre, sans gravité
+            applyBoundaries(m, domain)
+        end
+        for i in 1:length(molecules), j in i+1:length(molecules)
+            if detectCollision(molecules[i], molecules[j])
+                computeCollision(molecules[i], molecules[j])
+            end
+        end
+        push!(times, k*dt)
+        push!(entropies, shannonEntropy(molecules, domain, nx_bins))
+    end
+
+    if animate
+        anim = @animate for k in 0:nsteps
+            record!(k)
+            scatter([m.position[1] for m in molecules],
+                    [m.position[2] for m in molecules],
+                    [m.position[3] for m in molecules],
+                    xlims=(0, domain.L[1]), ylims=(0, domain.L[2]), zlims=(0, domain.L[3]),
+                    legend=false, markersize=2, markerstrokewidth=0,
+                    camera=(30, 25), title="Ouverture de la paroi (3D)")
+        end every save_every
+    else
+        anim = nothing
+        for k in 0:nsteps
+            record!(k)
+        end
+    end
+
+    return (anim=anim, times=times, entropies=entropies)
+end
+
+# ╔═╡ 15b32504-f8fe-4bdb-adc0-687c7c848bc6
+begin
+    He_hs = Molecule([0.0,0.0,0.0], [0.0,0.0,0.0], 6.646e-27, 1.1e-10, "He")  # rayon hard sphere (énoncé)
+
+    # Phase 1 — paroi fermée : 400 atomes confinés dans 1/8 du domaine
+    domain_small = Domain([10e-9, 10e-9, 10e-9])
+    gasOpen = initaliseGasInRegion(400, domain_small, He_hs, 1400.0,
+                                   (0, 5e-9), (0, 5e-9), (0, 5e-9))
+    phase1 = simulateOpening(gasOpen, domain_small, 1e-14, 5000; nx_bins=10, animate=false)
+
+    # Phase 2 — on ouvre : le domaine double sur x ([-5,15]·1e-9), +5000 pas
+    domain_large = Domain([20e-9, 10e-9, 10e-9])
+    phase2 = simulateOpening(gasOpen, domain_large, 1e-14, 5000; nx_bins=20, animate=true)
+end
+
+# ╔═╡ 188655a1-3880-4340-a9bd-e20410d5461d
+gif(phase2.anim, fps=20)
+
+# ╔═╡ 171250e6-688e-4510-a1d2-61e82cec4b82
+begin
+    t_open = vcat(phase1.times, phase2.times .+ phase1.times[end])
+    H_open = vcat(phase1.entropies, phase2.entropies)
+    plot(t_open, H_open, xlabel="t (s)", ylabel="H (bits)",
+         title="Entropie — paroi fermée puis ouverte", legend=false, lw=2)
+    vline!([phase1.times[end]], ls=:dash, color=:red, label="ouverture")
+end
+
+# ╔═╡ ecbb55fd-f273-4238-be8a-6c5fb4ec4929
+md"""
+On observe une chute ou niveau de l'entropie, puis elle remontre progressivement se dispersant dans le nouveau domaine.
+"""
+
+# ╔═╡ 04eb480c-95cf-4bd6-b26d-865d95d2c2b1
+md"""
+## 13.1 :
+Pourquoi les vitesses suivent des distributions diérentes ?
+"""
+
+# ╔═╡ a3a5e147-819d-414c-9162-6821e97c7cdc
+md"""
+### 13.2 :
+Implémentez la nouvelle condition de bord en prenant en ajoutant en paramètres: la température du bord haut (z+) et la température du bord bas (z−).
+"""
+
+# ╔═╡ 9e2170bf-752c-48bf-bce5-4b8ce0a32ded
+function applyBoundariesWithTemp(molecule::Molecule, domain::Domain, T_low::Float64, T_high::Float64)
+    # axes x et y — réflexion spéculaire normale
+    for i in 1:2
+        if molecule.position[i] < 0
+            molecule.position[i] = -molecule.position[i]
+            molecule.velocity[i] = -molecule.velocity[i]
+        elseif molecule.position[i] > domain.L[i]
+            molecule.position[i] = 2*domain.L[i] - molecule.position[i]
+            molecule.velocity[i] = -molecule.velocity[i]
+        end
+    end
+    
+    # axe z — réémission thermique
+    if molecule.position[3] < 0
+        σ = sqrt(1.380649e-23 * T_low / molecule.mass)
+        molecule.position[3] = -molecule.position[3]
+        molecule.velocity[1] = randn() * σ
+        molecule.velocity[2] = randn() * σ
+        molecule.velocity[3] = σ * sqrt(-2*log(rand()))  # Rayleigh, positif vers intérieur
+    elseif molecule.position[3] > domain.L[3]
+        σ = sqrt(1.380649e-23 * T_high / molecule.mass)
+        molecule.position[3] = 2*domain.L[3] - molecule.position[3]
+        molecule.velocity[1] = randn() * σ
+        molecule.velocity[2] = randn() * σ
+        molecule.velocity[3] = -σ * sqrt(-2*log(rand()))  # Rayleigh, négatif vers intérieur
+    end
+end
+
+# ╔═╡ 4ffc6f10-cc9c-4572-84e7-fa63deac5ca5
+function simulate(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64;
+        gravity::Vector{Float64} = [0.0, 0.0, 0.0],  
+        T_low  = nothing,                              
+        T_high = nothing,
+        view::Symbol     = :xyz,                      
+        color_species::Bool   = false,                 
+        compute_entropy::Bool = false,                 
+        animate::Bool         = true,                  
+        save_every::Int       = 100)
+
+    kb = 1.380649e-23
+    V  = domainVolume(domain)
+
+    times = Float64[]; mean_speeds = Float64[]
+    Ts = Float64[]; Ps = Float64[]; entropies = Float64[]
+
+    # --- un pas de simulation + collecte des grandeurs ---
+    function record!(t)
+        for m in molecules
+            computeNextPositionGravity(m, dt, gravity)
+            isnothing(T_low) ? applyBoundaries(m, domain) :
+                               applyBoundariesWithTemp(m, domain, T_low, T_high)
+        end
+        for i in 1:length(molecules), j in i+1:length(molecules)
+            if detectCollision(molecules[i], molecules[j])
+                computeCollision(molecules[i], molecules[j])
+            end
+        end
+        sum_mv2 = sum(m.mass * norm(m.velocity)^2 for m in molecules)
+        push!(times, t)
+        push!(mean_speeds, mean(norm(m.velocity) for m in molecules))
+        push!(Ts, sum_mv2 / (length(molecules) * 3 * kb))   # α : <mv²>/(3kb) → T
+        push!(Ps, sum_mv2 / (3 * V))                         # β : Σmv²/(3V) → P
+        compute_entropy && push!(entropies, shannonEntropy(molecules, domain))
+    end
+
+    # --- construction d'une image selon la vue choisie ---
+    function frameplot()
+        getf = view === :xy ? (m->m.position[1], m->m.position[2]) :
+               view === :xz ? (m->m.position[1], m->m.position[3]) :
+                              (m->m.position[1], m->m.position[2], m->m.position[3])
+        lims = view === :xy ? (xlims=(0,domain.L[1]), ylims=(0,domain.L[2])) :
+               view === :xz ? (xlims=(0,domain.L[1]), ylims=(0,domain.L[3])) :
+                              (xlims=(0,domain.L[1]), ylims=(0,domain.L[2]), zlims=(0,domain.L[3]))
+        common = view === :xyz ? (markersize=2, markerstrokewidth=0, camera=(30,25)) :
+                                 (markersize=2, markerstrokewidth=0)
+        coords(sub) = [[f(m) for m in sub] for f in getf]
+
+        if color_species
+            sps = unique(m.formula for m in molecules)
+            plt = scatter(coords(filter(m->m.formula==sps[1], molecules))...;
+                          label=sps[1], legend=true, title="Simulation", lims..., common...)
+            for sp in sps[2:end]
+                scatter!(plt, coords(filter(m->m.formula==sp, molecules))...; label=sp, common...)
+            end
+            return plt
+        else
+            return scatter(coords(molecules)...;
+                           legend=false, title="Simulation", lims..., common...)
+        end
+    end
+
+    if animate
+        anim = @animate for t in 0:dt:finalTime
+            record!(t)
+            frameplot()
+        end every save_every
+    else
+        anim = nothing
+        for t in 0:dt:finalTime
+            record!(t)
+        end
+    end
+
+    return (anim=anim, times=times, mean_speeds=mean_speeds, T=Ts, P=Ps, entropy=entropies)
+end
+
+# ╔═╡ 17f7570b-318a-4582-bcff-d2230c49013a
+begin
+	domain = Domain([10e-9, 10e-9, 10e-9])
+	moleculesRandom = initaliseGasAtRandom(400, domain, [He], 1400.0)
+	res7 = simulate(moleculesRandom, domain, 1e-14, 1e-10)
+	gif(res7.anim, fps=20)
+end
+
+# ╔═╡ 205df3c6-ff87-458c-8b65-232bd38a0f6b
+histogram([norm(m.velocity) for m in moleculesRandom], 
+    xlabel="v (m/s)", ylabel="nombre d'atomes", 
+    legend=false, title="Distribution des vitesses")
+
+# ╔═╡ 402cdb02-9388-4efe-b25b-c05fdbf494fc
+begin
+    domain8 = Domain([20e-9, 20e-9, 20e-9])
+    molecules8 = initaliseGasAtRandom(500, domain8, [He], 1367.0)
+    res8 = simulate(molecules8, domain8, 1e-14, 5e-11; gravity=[0.0, 0.0, -9.81e13], view=:xyz)
+end
+
+# ╔═╡ a25b46f6-b91d-4ce3-b2c7-4be439c4bc47
+gif(res8.anim, fps=20)
+
+# ╔═╡ 8047a34e-aec3-47da-8f82-6924d6d6895d
+histogram([m.position[3] for m in molecules8], 
+    normalize=true,
+    xlabel="z (m)", ylabel="probabilité", 
+    legend=false, title="Probabilité de présence en z")
+
+# ╔═╡ d056e4e7-29cb-4db5-864c-e255415064a0
+histogram([m.position[3] for m in molecules8],
+    weights=[norm(m.velocity)^2 for m in molecules8] .* He.mass / (3 * domainVolume(domain8)),
+    normalize=false,
+    xlabel="z (m)", ylabel="pression (Pa)",
+    legend=false, title="Pression en fonction de z")
+
+# ╔═╡ 1347075f-4dd5-4b72-9ad7-ab49d6f99621
+begin
+    Ar = Molecule([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 6.634e-26, 1.88e-10, "Ar")
+    
+    domain9 = Domain([20e-9, 20e-9, 20e-9])
+    molecules9 = vcat(
+        initaliseGasAtRandom(400, domain9, [He], 789.45),
+        initaliseGasAtRandom(200, domain9, [Ar], 249.88)
+    )
+    res9 = simulate(molecules9, domain9, 1e-14, 5e-11;
+    gravity=[0.0,0.0,-9.81e13], color_species=true)
+    gif(res9.anim, fps=20)
+end
+
+# ╔═╡ e28de34a-99c6-4c34-94b9-dcdaa11d2eef
+begin
+p_he = histogram([m.position[3] for m in molecules9 if m.formula == "He"],
+    normalize=true, color=:blue, label="He",
+    xlabel="z (m)", ylabel="probabilité")
+
+p_ar = histogram([m.position[3] for m in molecules9 if m.formula == "Ar"],
+    normalize=true, color=:red, label="Ar",
+    xlabel="z (m)", ylabel="probabilité")
+
+plot(p_he, p_ar, layout=(1,2))
+end
+
 # ╔═╡ eb953969-6e32-47cd-afa3-22e324ed32ea
 begin
 weights_he = [m.mass * norm(m.velocity)^2 for m in molecules9 if m.formula == "He"]
@@ -937,6 +1320,12 @@ begin
     plot(p1)
 end
 
+# ╔═╡ 3150f9cb-d3c6-4a47-872b-ecf879dc3032
+begin
+p3 = histogram(z_he, weights=weights_he ./ (3*1.380649e-23), color=:blue, label="He", title="Température", alpha=0.5)
+histogram!(p3, z_ar, weights=weights_ar ./ (3*1.380649e-23), color=:red, label="Ar", alpha=0.5)
+end
+
 # ╔═╡ d68b317d-fcd5-45bf-abef-e487b8a5d591
 begin
 p2 = histogram(z_he, weights=weights_he ./ (3*domainVolume(domain9)), color=:blue, label="He", title="Pression", alpha=0.5)
@@ -945,10 +1334,82 @@ histogram!(p2, z_ar, weights=weights_ar ./ (3*domainVolume(domain9)), color=:red
 plot(p2)
 end
 
-# ╔═╡ 3150f9cb-d3c6-4a47-872b-ecf879dc3032
+# ╔═╡ 69e417a1-1822-4976-a26f-3186430d68e2
 begin
-p3 = histogram(z_he, weights=weights_he ./ (3*1.380649e-23), color=:blue, label="He", title="Température", alpha=0.5)
-histogram!(p3, z_ar, weights=weights_ar ./ (3*1.380649e-23), color=:red, label="Ar", alpha=0.5)
+times, alphas = simulateCollectStats(molecules9, domain9, 1e-14, 5e-11, [0.0, 0.0, -9.81e13])
+
+window = 1000
+stability = []
+
+for i in window:length(alphas)
+    fenetre = alphas[i-window+1:i]
+    push!(stability, std(fenetre)/mean(fenetre))
+end
+
+plot(stability,
+    xlabel="pas de temps", ylabel="σ/μ",
+    title="Critère de stabilité", legend=false)
+hline!([0.05], color=:red, label="seuil 5%")
+end
+
+# ╔═╡ 8f2fbc00-f600-435e-b3c3-c190be49b158
+"""md
+Question 13.3 :
+Réalisez la simulation suivante.
+Conditions initiales de la simulation
+ Domaine de simulation (m) : [−2 · 10−9, 2 · 10−9] × [−2 · 10−9, 2 · 10−9] × [−5 · 10−9, 5 · 10−9]
+ Température du bord haut (K) : 700
+ Température du bord bas (K): 300
+ Masse de l'hélium (kg) : 6.646 · 10−27
+ Rayon de l'hélium - modèle hard sphere (m) : 1.1 · 10−10
+ Nombre d'atomes : 500
+ Vitesse initiale de chaque atome (m/s) : 1400
+ Pas de temps (s) : 1 · 10−14
+ Temps nal (s) : 1 · 10−10
+Question 13.4 :
+Achez l'évolution de l'entropie au cours du temps.
+Question 13.5 :
+A la n de la simulation tracez l'évolution de la température en fonction de z. Qu'observez-vous ?
+"""
+
+# ╔═╡ f11f0c92-44bc-4690-afde-d9be21b4f536
+# ╠═╡ disabled = true
+#=╠═╡
+function simulate13(molecules::Vector{Molecule}, domain::Domain, dt::Float64, finalTime::Float64, T_low::Float64, T_high::Float64)
+    times = []
+    entropies = []
+    
+    @gif for t in 0:dt:finalTime
+        for molecule in molecules
+            computeNextPosition(molecule, dt)
+            applyBoundariesWithTemp(molecule, domain, T_low, T_high)
+        end
+        for i in 1:length(molecules)
+            for j in i+1:length(molecules)
+                if detectCollision(molecules[i], molecules[j])
+                    computeCollision(molecules[i], molecules[j])
+                end
+            end
+        end
+        push!(times, t)
+        push!(entropies, shannonEntropy(molecules, domain))
+        
+        scatter([m.position[1] for m in molecules], [m.position[3] for m in molecules],
+            xlims=(0, domain.L[1]), ylims=(0, domain.L[3]),
+            legend=false, title="Positions (x,z)")
+    end every 100
+    
+    return g, times, entropies
+end
+  ╠═╡ =#
+
+# ╔═╡ 06be4d04-b604-44ad-b21c-41f3f0d154fe
+begin
+	domain13 = Domain([4e-9, 4e-9, 10e-9])
+molecules13 = initaliseGasAtRandom(500, domain13, [He], 1400.0)
+res13 = simulate(molecules13, domain13, 1e-14, 1e-10;
+                 T_low=300.0, T_high=700.0, view=:xyz, compute_entropy=true)
+gif(res13.anim, fps=20)
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -957,10 +1418,12 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Plots = "~1.41.6"
+StatsBase = "~0.34.10"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -969,7 +1432,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "400edb41e68664628cd3ca53ea85b10e181c109c"
+project_hash = "f7cf84feed17865ab16e11fc767925aa177caf91"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -2134,8 +2597,9 @@ version = "1.13.0+0"
 # ╠═54811911-1303-4acb-a666-7bb72dcf3ebb
 # ╠═b7b7b4e9-a125-47e3-8054-5ecf5b21d704
 # ╠═1ed02f4a-6ba4-416c-8554-7b7d71e04368
-# ╠═431388d3-71a6-4187-8476-a4a939fbfa37
+# ╟─431388d3-71a6-4187-8476-a4a939fbfa37
 # ╠═402cdb02-9388-4efe-b25b-c05fdbf494fc
+# ╠═a25b46f6-b91d-4ce3-b2c7-4be439c4bc47
 # ╠═7bb387ab-f469-4179-8733-912203ba94b0
 # ╠═8047a34e-aec3-47da-8f82-6924d6d6895d
 # ╠═f3d01dff-1774-4cad-8829-652bbf4cba9b
@@ -2144,7 +2608,7 @@ version = "1.13.0+0"
 # ╠═3f5235ca-9adf-4e9d-b6f1-22ea36606712
 # ╠═d056e4e7-29cb-4db5-864c-e255415064a0
 # ╠═f71e8ecb-e04a-4df3-9568-f3d946b0ec60
-# ╠═6835f289-57cd-44cd-a5f3-32cf0f8232ba
+# ╟─6835f289-57cd-44cd-a5f3-32cf0f8232ba
 # ╠═1347075f-4dd5-4b72-9ad7-ab49d6f99621
 # ╠═855ace40-74b1-4aa3-b345-a9b4c23d8173
 # ╠═e28de34a-99c6-4c34-94b9-dcdaa11d2eef
@@ -2154,5 +2618,31 @@ version = "1.13.0+0"
 # ╠═bf9992bc-5637-4fc4-9bc0-4332b64bfdbc
 # ╠═d68b317d-fcd5-45bf-abef-e487b8a5d591
 # ╠═3150f9cb-d3c6-4a47-872b-ecf879dc3032
+# ╠═77a04d8c-c3c2-4fc5-8673-ea206a6b4d73
+# ╠═d7d821a0-e809-4d09-b0fc-f2cab5a970c7
+# ╠═e617fe99-22c3-4f21-843c-7c3c3a086d97
+# ╟─fda906ad-394f-4b72-9f2f-cef7a5821b22
+# ╠═69e417a1-1822-4976-a26f-3186430d68e2
+# ╠═8fb8ce4e-ea89-4008-a5fa-99be6205fafc
+# ╠═ead9a443-4aa3-4a45-9a14-e028e9862dc7
+# ╠═2be52041-7d82-40e5-b62b-301ac0bf59b5
+# ╠═cec34ee7-b494-4607-820c-4be5f76539e9
+# ╠═1c2bd9bc-c679-4b41-8a8d-fbb79556c1a9
+# ╠═d28f93f2-db90-4658-95c4-39297f1cb7ac
+# ╠═158780a9-a947-47c3-9205-0aaae8d4978e
+# ╠═25290cf7-6296-41fa-80f7-1bf2f47f2450
+# ╠═c28d8f25-a33f-47df-b728-0e9a899608f6
+# ╟─eb7cfb2b-dd24-4fb8-ac76-aebe082f9c8d
+# ╠═2945adb0-86db-4265-93bf-262de9271a05
+# ╠═15b32504-f8fe-4bdb-adc0-687c7c848bc6
+# ╠═188655a1-3880-4340-a9bd-e20410d5461d
+# ╠═171250e6-688e-4510-a1d2-61e82cec4b82
+# ╠═ecbb55fd-f273-4238-be8a-6c5fb4ec4929
+# ╠═04eb480c-95cf-4bd6-b26d-865d95d2c2b1
+# ╠═a3a5e147-819d-414c-9162-6821e97c7cdc
+# ╠═9e2170bf-752c-48bf-bce5-4b8ce0a32ded
+# ╠═8f2fbc00-f600-435e-b3c3-c190be49b158
+# ╟─f11f0c92-44bc-4690-afde-d9be21b4f536
+# ╠═06be4d04-b604-44ad-b21c-41f3f0d154fe
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

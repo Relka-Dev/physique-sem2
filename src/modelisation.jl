@@ -1131,7 +1131,17 @@ On observe une chute ou niveau de l'entropie, puis elle remontre progressivement
 # ╔═╡ 04eb480c-95cf-4bd6-b26d-865d95d2c2b1
 md"""
 ## 13.1 :
-Pourquoi les vitesses suivent des distributions diérentes ?
+Pourquoi les vitesses suivent des distributions différentes ?
+
+- Le long du mur (vx, vy) : aucune direction privilégiée, la molécule peut
+  glisser vers la gauche ou la droite. → distribution gaussienne centrée sur 0.
+
+- Perpendiculaire au mur (vz) : la molécule vient de taper la paroi, elle doit
+  forcément repartir vers l'intérieur du domaine (un seul sens possible). Une
+  gaussienne centrée sur 0 n'aurait pas de sens (la moitié repartirait dans le
+  mur). De plus, les molécules rapides quittent la paroi plus souvent que les
+  lentes, ce qui pondère la distribution par la vitesse. → distribution de
+  Rayleigh.
 """
 
 # ╔═╡ a3a5e147-819d-414c-9162-6821e97c7cdc
@@ -1404,6 +1414,9 @@ function simulate13(molecules::Vector{Molecule}, domain::Domain, dt::Float64, fi
 end
   ╠═╡ =#
 
+# ╔═╡ 191ae64f-4b63-458c-bba0-baabf3db2fbd
+
+
 # ╔═╡ 06be4d04-b604-44ad-b21c-41f3f0d154fe
 begin
 	domain13 = Domain([4e-9, 4e-9, 10e-9])
@@ -1411,6 +1424,39 @@ molecules13 = initaliseGasAtRandom(500, domain13, [He], 1400.0)
 res13 = simulate(molecules13, domain13, 1e-14, 1e-10;
 				 T_low=300.0, T_high=700.0, compute_entropy=true)
 gif(res13.anim, fps=20)
+end
+
+# ╔═╡ 81660bf8-e3ae-45a3-8921-59b99eacd252
+plot(res13.times, res13.entropy,
+     xlabel="t (s)", ylabel="H (bits)",
+     title="Entropie au cours du temps (13.4)", legend=false, lw=2)
+
+# ╔═╡ 091fb8bb-dedb-4111-ab45-426d062a1130
+function temperatureProfile(molecules::Vector{Molecule}, domain::Domain; nbins::Int=10)
+    kb = 1.380649e-23
+    edges = range(0, domain.L[3], length=nbins+1)
+    z_centers = Float64[]
+    T_local   = Float64[]
+    for b in 1:nbins
+        zlo, zhi = edges[b], edges[b+1]
+        in_bin = [m for m in molecules if zlo <= m.position[3] < zhi]
+        if !isempty(in_bin)
+            sum_mv2 = sum(m.mass * norm(m.velocity)^2 for m in in_bin)
+            push!(T_local,   sum_mv2 / (length(in_bin) * 3 * kb))
+            push!(z_centers, (zlo + zhi) / 2)
+        end
+    end
+    return z_centers, T_local
+end
+
+# ╔═╡ ecdca7fa-4268-472d-849e-f144764fc082
+begin
+    z_prof, T_prof = temperatureProfile(molecules13, domain13; nbins=10)
+    plot(z_prof, T_prof,
+         xlabel="z (m)", ylabel="T (K)",
+         title="Profil de température (13.5)",
+         legend=false, lw=2, marker=:circle)
+    hline!([300, 700], ls=:dash, color=:gray)
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2668,6 +2714,10 @@ version = "1.13.0+0"
 # ╠═9e2170bf-752c-48bf-bce5-4b8ce0a32ded
 # ╠═8f2fbc00-f600-435e-b3c3-c190be49b158
 # ╟─f11f0c92-44bc-4690-afde-d9be21b4f536
+# ╠═191ae64f-4b63-458c-bba0-baabf3db2fbd
 # ╠═06be4d04-b604-44ad-b21c-41f3f0d154fe
+# ╠═81660bf8-e3ae-45a3-8921-59b99eacd252
+# ╠═091fb8bb-dedb-4111-ab45-426d062a1130
+# ╠═ecdca7fa-4268-472d-849e-f144764fc082
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
